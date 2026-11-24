@@ -1,5 +1,8 @@
 const DB_NAME = "senada-music-library";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
+const DRIVE_BACKUP_NAME = "senada-library-v1";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+const BACKUP_MAGIC = "SENADA1\n";
 const audio = document.querySelector("#audio-player");
 const trackList = document.querySelector("#track-list");
 const emptyState = document.querySelector("#empty-state");
@@ -17,9 +20,13 @@ let database;
 let tracks = [];
 let playlists = [];
 let recentHistory = [];
+let syncMarkers = [];
 let currentTrackId = null;
 let selectedPlaylistId = null;
 let playbackPlaylistId = null;
+let googleAccessToken = null;
+let googleTokenExpiresAt = 0;
+let driveSyncInProgress = false;
 let toastTimer;
 
 function openDatabase() {
@@ -36,6 +43,9 @@ function openDatabase() {
       }
       if (!db.objectStoreNames.contains("recentlyPlayed")) {
         db.createObjectStore("recentlyPlayed", { keyPath: "trackId" });
+      }
+      if (!db.objectStoreNames.contains("syncMarkers")) {
+        db.createObjectStore("syncMarkers", { keyPath: "key" });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -254,17 +264,19 @@ function renderAll() {
 }
 
 async function loadLibrary() {
-  const transaction = database.transaction(["tracks", "playlists", "recentlyPlayed"], "readonly");
+  const transaction = database.transaction(["tracks", "playlists", "recentlyPlayed", "syncMarkers"], "readonly");
   const done = transactionDone(transaction);
-  const [storedTracks, storedPlaylists, storedHistory] = await Promise.all([
+  const [storedTracks, storedPlaylists, storedHistory, storedMarkers] = await Promise.all([
     requestResult(transaction.objectStore("tracks").getAll()),
     requestResult(transaction.objectStore("playlists").getAll()),
     requestResult(transaction.objectStore("recentlyPlayed").getAll()),
+    requestResult(transaction.objectStore("syncMarkers").getAll()),
     done
   ]);
   tracks = storedTracks.sort((a, b) => b.addedAt - a.addedAt);
   playlists = storedPlaylists.sort((a, b) => b.createdAt - a.createdAt);
   recentHistory = storedHistory;
+  syncMarkers = storedMarkers;
   renderAll();
 }
 
@@ -283,7 +295,8 @@ async function saveFiles(files) {
     file,
     size: file.size,
     duration: 0,
-    addedAt: Date.now()
+    addedAt: Date.now(),
+    updatedAt: Date.now()
   }));
   addedTracks.forEach((track) => store.add(track));
   await transactionDone(transaction);
@@ -317,7 +330,8 @@ async function createPlaylist(event) {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     name,
     trackIds: [],
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    updatedAt: Date.now()
   };
   try {
     const transaction = database.transaction("playlists", "readwrite");
@@ -373,7 +387,7 @@ async function savePlaylistTracks(event) {
   const selectedIds = Array.from(document.querySelectorAll("#playlist-song-options input:checked"))
     .map((checkbox) => checkbox.value)
     .filter((id) => tracks.some((track) => track.id === id));
-  const updatedPlaylist = { ...playlist, trackIds: selectedIds };
+  const updatedPlaylist = { ...playlist, trackIds: selectedIds, updatedAt: Date.now() };
 
   try {
     const transaction = database.transaction("playlists", "readwrite");
@@ -391,7 +405,8 @@ async function savePlaylistTracks(event) {
 async function removeTrackFromPlaylist(playlist, track) {
   const updatedPlaylist = {
     ...playlist,
-    trackIds: playlist.trackIds.filter((trackId) => trackId !== track.id)
+    trackIds: playlist.trackIds.filter((trackId) => trackId !== track.id),
+    updatedAt: Date.now()
   };
   try {
     const transaction = database.transaction("playlists", "readwrite");
@@ -412,10 +427,18 @@ async function deletePlaylist() {
   const playlist = playlists.find((item) => item.id === selectedPlaylistId);
   if (!playlist || !window.confirm(`Hapus playlist “${playlist.name}”? Lagu di perpustakaan tidak akan dihapus.`)) return;
   try {
-    const transaction = database.transaction("playlists", "readwrite");
+    const marker = {
+      key: `playlist:${playlist.id}`,
+      type: "playlist",
+      id: playlist.id,
+      deletedAt: Date.now()
+    };
+    const transaction = database.transaction(["playlists", "syncMarkers"], "readwrite");
     transaction.objectStore("playlists").delete(playlist.id);
+    transaction.objectStore("syncMarkers").put(marker);
     await transactionDone(transaction);
     playlists = playlists.filter((item) => item.id !== playlist.id);
+    syncMarkers = [...syncMarkers.filter((item) => item.key !== marker.key), marker];
     if (playbackPlaylistId === playlist.id) playbackPlaylistId = null;
     selectedPlaylistId = playlists.length > 0 ? playlists[0].id : null;
     renderAll();
@@ -488,14 +511,22 @@ async function removeTrack(track) {
         ...playlist,
         trackIds: playlist.trackIds.filter((trackId) => trackId !== track.id)
       }));
-    const transaction = database.transaction(["tracks", "playlists", "recentlyPlayed"], "readwrite");
+    const marker = {
+      key: `track:${track.id}`,
+      type: "track",
+      id: track.id,
+      deletedAt: Date.now()
+    };
+    const transaction = database.transaction(["tracks", "playlists", "recentlyPlayed", "syncMarkers"], "readwrite");
     transaction.objectStore("tracks").delete(track.id);
     transaction.objectStore("recentlyPlayed").delete(track.id);
+    transaction.objectStore("syncMarkers").put(marker);
     updatedPlaylists.forEach((playlist) => transaction.objectStore("playlists").put(playlist));
     await transactionDone(transaction);
     tracks = tracks.filter((item) => item.id !== track.id);
     playlists = playlists.map((playlist) => updatedPlaylists.find((item) => item.id === playlist.id) || playlist);
     recentHistory = recentHistory.filter((item) => item.trackId !== track.id);
+    syncMarkers = [...syncMarkers.filter((item) => item.key !== marker.key), marker];
     const objectUrl = objectUrls.get(track.id);
     if (objectUrl) {
       URL.revokeObjectURL(objectUrl);
@@ -513,6 +544,318 @@ async function removeTrack(track) {
     showToast(`“${track.title}” dihapus dari perangkat.`);
   } catch (error) {
     showToast(`Lagu gagal dihapus: ${error.message}`, true);
+  }
+}
+
+function getLocalSyncState() {
+  return {
+    tracks: tracks.slice(),
+    playlists: playlists.slice(),
+    recentHistory: recentHistory.slice(),
+    syncMarkers: syncMarkers.slice()
+  };
+}
+
+function createBackupBlob(state) {
+  const fileParts = [];
+  let offset = 0;
+  const trackMetadata = state.tracks.map((track) => {
+    const file = track.file;
+    const fileName = file.name || track.fileName || `${track.title}.audio`;
+    const byteLength = file.size;
+    const metadata = {
+      ...track,
+      file: undefined,
+      fileName,
+      mimeType: file.type || track.mimeType || "application/octet-stream",
+      byteLength,
+      fileOffset: offset
+    };
+    fileParts.push(file);
+    offset += byteLength;
+    return metadata;
+  });
+  const metadata = JSON.stringify({
+    version: 1,
+    tracks: trackMetadata,
+    playlists: state.playlists,
+    recentHistory: state.recentHistory,
+    syncMarkers: state.syncMarkers
+  });
+  const metadataBytes = new TextEncoder().encode(metadata);
+  const metadataLength = new Uint8Array(4);
+  new DataView(metadataLength.buffer).setUint32(0, metadataBytes.byteLength, false);
+  return new Blob([BACKUP_MAGIC, metadataLength, metadataBytes, ...fileParts], {
+    type: "application/octet-stream"
+  });
+}
+
+async function parseBackupBlob(blob) {
+  if (blob.size < 12) throw new Error("Cadangan Google Drive tidak valid.");
+  const prefix = await blob.slice(0, 12).arrayBuffer();
+  const prefixBytes = new Uint8Array(prefix);
+  if (new TextDecoder().decode(prefixBytes.slice(0, 8)) !== BACKUP_MAGIC) {
+    throw new Error("Format cadangan Google Drive tidak dikenal.");
+  }
+  const metadataLength = new DataView(prefix).getUint32(8, false);
+  const dataStart = 12 + metadataLength;
+  if (metadataLength === 0 || dataStart > blob.size) {
+    throw new Error("Cadangan Google Drive rusak atau tidak lengkap.");
+  }
+
+  const metadata = JSON.parse(await blob.slice(12, dataStart).text());
+  if (metadata.version !== 1 || !Array.isArray(metadata.tracks)) {
+    throw new Error("Versi cadangan Google Drive tidak didukung.");
+  }
+  const restoredTracks = metadata.tracks.map((track) => {
+    const start = dataStart + track.fileOffset;
+    const end = start + track.byteLength;
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < dataStart || end > blob.size) {
+      throw new Error(`Data lagu “${track.title}” di cadangan tidak valid.`);
+    }
+    const fileBlob = blob.slice(start, end, track.mimeType);
+    return {
+      ...track,
+      file: new File([fileBlob], track.fileName || `${track.title}.audio`, {
+        type: track.mimeType || "application/octet-stream"
+      })
+    };
+  });
+  return {
+    tracks: restoredTracks,
+    playlists: Array.isArray(metadata.playlists) ? metadata.playlists : [],
+    recentHistory: Array.isArray(metadata.recentHistory) ? metadata.recentHistory : [],
+    syncMarkers: Array.isArray(metadata.syncMarkers) ? metadata.syncMarkers : []
+  };
+}
+
+function recordUpdatedAt(record) {
+  return record.updatedAt || record.addedAt || record.createdAt || 0;
+}
+
+function latestById(records, getTimestamp) {
+  const result = new Map();
+  records.forEach((record) => {
+    const existing = result.get(record.id);
+    if (!existing || getTimestamp(record) >= getTimestamp(existing)) {
+      result.set(record.id, record);
+    }
+  });
+  return result;
+}
+
+function mergeSyncStates(localState, remoteState) {
+  const markersByKey = new Map();
+  [...localState.syncMarkers, ...remoteState.syncMarkers].forEach((marker) => {
+    const existing = markersByKey.get(marker.key);
+    if (!existing || marker.deletedAt > existing.deletedAt) {
+      markersByKey.set(marker.key, marker);
+    }
+  });
+  const mergedMarkers = Array.from(markersByKey.values());
+  const latestTrackRecords = latestById(
+    [...localState.tracks, ...remoteState.tracks],
+    recordUpdatedAt
+  );
+  const trackDeletions = new Map(mergedMarkers
+    .filter((marker) => marker.type === "track")
+    .map((marker) => [marker.id, marker.deletedAt]));
+  const mergedTracks = Array.from(latestTrackRecords.values())
+    .filter((track) => !trackDeletions.has(track.id) || trackDeletions.get(track.id) < recordUpdatedAt(track));
+  const survivingTrackIds = new Set(mergedTracks.map((track) => track.id));
+
+  const latestPlaylistRecords = latestById(
+    [...localState.playlists, ...remoteState.playlists],
+    recordUpdatedAt
+  );
+  const playlistDeletions = new Map(mergedMarkers
+    .filter((marker) => marker.type === "playlist")
+    .map((marker) => [marker.id, marker.deletedAt]));
+  const mergedPlaylists = Array.from(latestPlaylistRecords.values())
+    .filter((playlist) => !playlistDeletions.has(playlist.id) || playlistDeletions.get(playlist.id) < recordUpdatedAt(playlist))
+    .map((playlist) => ({
+      ...playlist,
+      trackIds: playlist.trackIds.filter((trackId) => survivingTrackIds.has(trackId))
+    }));
+
+  const historyByTrack = new Map();
+  [...localState.recentHistory, ...remoteState.recentHistory].forEach((entry) => {
+    const existing = historyByTrack.get(entry.trackId);
+    if (survivingTrackIds.has(entry.trackId) && (!existing || entry.playedAt > existing.playedAt)) {
+      historyByTrack.set(entry.trackId, entry);
+    }
+  });
+  return {
+    tracks: mergedTracks,
+    playlists: mergedPlaylists,
+    recentHistory: Array.from(historyByTrack.values()),
+    syncMarkers: mergedMarkers
+  };
+}
+
+async function saveSyncState(state) {
+  const transaction = database.transaction(
+    ["tracks", "playlists", "recentlyPlayed", "syncMarkers"],
+    "readwrite"
+  );
+  const stores = {
+    tracks: transaction.objectStore("tracks"),
+    playlists: transaction.objectStore("playlists"),
+    recentlyPlayed: transaction.objectStore("recentlyPlayed"),
+    syncMarkers: transaction.objectStore("syncMarkers")
+  };
+  Object.keys(stores).forEach((name) => stores[name].clear());
+  state.tracks.forEach((track) => stores.tracks.put(track));
+  state.playlists.forEach((playlist) => stores.playlists.put(playlist));
+  state.recentHistory.forEach((entry) => stores.recentlyPlayed.put(entry));
+  state.syncMarkers.forEach((marker) => stores.syncMarkers.put(marker));
+  await transactionDone(transaction);
+
+  tracks = state.tracks.sort((a, b) => b.addedAt - a.addedAt);
+  playlists = state.playlists.sort((a, b) => b.createdAt - a.createdAt);
+  recentHistory = state.recentHistory;
+  syncMarkers = state.syncMarkers;
+  if (currentTrackId && !tracks.some((track) => track.id === currentTrackId)) {
+    audio.pause();
+    audio.removeAttribute("src");
+    currentTrackId = null;
+    playbackPlaylistId = null;
+    playerBar.hidden = true;
+    document.body.classList.remove("is-playing-audio");
+  }
+  renderAll();
+}
+
+function getGoogleAccessToken() {
+  if (googleAccessToken && Date.now() < googleTokenExpiresAt - 60000) {
+    return Promise.resolve(googleAccessToken);
+  }
+  if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+    return Promise.reject(new Error("Layanan masuk Google belum termuat. Periksa koneksi internet lalu coba lagi."));
+  }
+
+  return new Promise((resolve, reject) => {
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: window.SENADA_GOOGLE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: (response) => {
+        if (response.error) {
+          reject(new Error(`Google menolak akses: ${response.error_description || response.error}`));
+          return;
+        }
+        googleAccessToken = response.access_token;
+        googleTokenExpiresAt = Date.now() + (response.expires_in || 3600) * 1000;
+        resolve(googleAccessToken);
+      },
+      error_callback: (error) => reject(new Error(error.message || "Jendela masuk Google tidak dapat dibuka."))
+    });
+    tokenClient.requestAccessToken({ prompt: "select_account" });
+  });
+}
+
+async function driveFetch(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${googleAccessToken}`,
+      ...(options.headers || {})
+    }
+  });
+  if (!response.ok) {
+    const details = await response.text();
+    if (response.status === 401) googleAccessToken = null;
+    throw new Error(`Google Drive (${response.status}): ${details.slice(0, 240) || response.statusText}`);
+  }
+  return response;
+}
+
+async function findDriveBackup() {
+  const query = encodeURIComponent(
+    `name = '${DRIVE_BACKUP_NAME}' and 'appDataFolder' in parents and trashed = false`
+  );
+  const response = await driveFetch(
+    `https://www.googleapis.com/drive/v3/files?q=${query}&spaces=appDataFolder&fields=files(id,name,modifiedTime)&pageSize=100`
+  );
+  const result = await response.json();
+  const files = result.files || [];
+  files.sort((a, b) => new Date(b.modifiedTime) - new Date(a.modifiedTime));
+  return files[0] || null;
+}
+
+async function downloadDriveBackup(fileId) {
+  const response = await driveFetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`
+  );
+  return parseBackupBlob(await response.blob());
+}
+
+async function uploadDriveBackup(fileId, blob) {
+  const isUpdate = Boolean(fileId);
+  const endpoint = isUpdate
+    ? `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=resumable&fields=id,name`
+    : "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name";
+  const metadata = isUpdate
+    ? {}
+    : { name: DRIVE_BACKUP_NAME, mimeType: "application/octet-stream", parents: ["appDataFolder"] };
+  const startResponse = await driveFetch(endpoint, {
+    method: isUpdate ? "PATCH" : "POST",
+    headers: {
+      "Content-Type": "application/json; charset=UTF-8",
+      "X-Upload-Content-Type": "application/octet-stream",
+      "X-Upload-Content-Length": String(blob.size)
+    },
+    body: JSON.stringify(metadata)
+  });
+  const uploadUrl = startResponse.headers.get("Location");
+  if (!uploadUrl) throw new Error("Google Drive tidak mengembalikan alamat untuk mengunggah cadangan.");
+  await driveFetch(uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: blob
+  });
+}
+
+async function syncWithGoogleDrive() {
+  const button = document.querySelector("#drive-sync-button");
+  const label = document.querySelector("#drive-sync-label");
+  if (driveSyncInProgress) return;
+  if (!navigator.onLine) {
+    showToast("Hubungkan ke internet untuk menyinkronkan dengan Google Drive.", true);
+    return;
+  }
+  if (!window.SENADA_GOOGLE_CLIENT_ID) {
+    showToast("Sinkronisasi Drive belum dikonfigurasi. Ikuti langkah penyiapan Google di README.", true);
+    return;
+  }
+
+  driveSyncInProgress = true;
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  label.textContent = "Menghubungkan ke Google Drive...";
+  try {
+    await getGoogleAccessToken();
+    const backup = await findDriveBackup();
+    const remoteState = backup ? await downloadDriveBackup(backup.id) : {
+      tracks: [],
+      playlists: [],
+      recentHistory: [],
+      syncMarkers: []
+    };
+    const mergedState = mergeSyncStates(getLocalSyncState(), remoteState);
+    await saveSyncState(mergedState);
+    label.textContent = "Mengunggah koleksi...";
+    const backupBlob = createBackupBlob(mergedState);
+    await uploadDriveBackup(backup && backup.id, backupBlob);
+    label.textContent = "Sinkronkan dengan Google Drive";
+    showToast(`Sinkronisasi selesai: ${tracks.length} lagu dan ${playlists.length} playlist. Koleksi di perangkat ini dan Drive sudah digabung.`);
+  } catch (error) {
+    label.textContent = "Coba sinkronkan lagi";
+    showToast(`Sinkronisasi gagal: ${error.message}`, true);
+    console.error("Google Drive sync failed:", error);
+  } finally {
+    driveSyncInProgress = false;
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
   }
 }
 
@@ -546,6 +889,7 @@ document.querySelector("#cancel-add-tracks").addEventListener("click", () => {
 });
 document.querySelector("#add-tracks-form").addEventListener("submit", savePlaylistTracks);
 document.querySelector("#delete-playlist-button").addEventListener("click", deletePlaylist);
+document.querySelector("#drive-sync-button").addEventListener("click", syncWithGoogleDrive);
 playButton.addEventListener("click", () => {
   if (audio.paused) {
     audio.play().then(() => document.body.classList.add("is-playing-audio"))

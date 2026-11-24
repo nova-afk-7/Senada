@@ -1,9 +1,10 @@
-const CACHE_NAME = "senada-shell-v2";
+const CACHE_NAME = "senada-shell-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./google-client-config.js",
   "./manifest.json",
   "./icon.svg"
 ];

@@ -1,0 +1,1 @@
+window.SENADA_GOOGLE_CLIENT_ID = "";
