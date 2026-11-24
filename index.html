@@ -58,6 +58,55 @@
           <div class="welcome-glow" aria-hidden="true"></div>
         </section>
 
+        <section class="collection-section" aria-labelledby="playlist-title">
+          <div class="collection-heading">
+            <div>
+              <p class="section-kicker">SUSUN SESUKAMU</p>
+              <h2 id="playlist-title">Playlist <span id="playlist-count" class="track-count">0 playlist</span></h2>
+            </div>
+            <button class="text-button" id="create-playlist-button" type="button">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              Buat playlist
+            </button>
+          </div>
+          <div class="playlist-grid" id="playlist-grid" aria-live="polite">
+            <div class="playlist-empty">Playlist buatanmu akan muncul di sini.</div>
+          </div>
+          <div class="playlist-detail" id="playlist-detail" hidden>
+            <div class="playlist-detail-heading">
+              <div>
+                <h3 id="selected-playlist-name"></h3>
+                <p id="selected-playlist-count"></p>
+              </div>
+              <div class="playlist-detail-actions">
+                <button class="text-button compact-button" id="add-tracks-button" type="button">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                  Tambah lagu
+                </button>
+                <button class="icon-button playlist-delete-button" id="delete-playlist-button" type="button" aria-label="Hapus playlist">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-.8 12H6.8L6 7m4 4v5m4-5v5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="track-list playlist-track-list" id="playlist-track-list" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <section class="collection-section recent-section" aria-labelledby="recent-title">
+          <div class="collection-heading">
+            <div>
+              <p class="section-kicker">PUTAR LAGI KAPAN SAJA</p>
+              <h2 id="recent-title">Baru diputar</h2>
+            </div>
+          </div>
+          <div class="track-list recent-track-list" id="recent-track-list" aria-live="polite">
+            <div class="empty-state recent-empty">
+              <h3>Belum ada lagu diputar</h3>
+              <p>Lagu yang kamu dengarkan akan muncul di sini.</p>
+            </div>
+          </div>
+        </section>
+
         <section class="library-section" aria-labelledby="library-title">
           <div class="library-heading">
             <div>
@@ -101,6 +150,37 @@
         <span class="footer-offline"><span class="connection-dot"></span> SIAP UNTUK OFFLINE</span>
       </footer>
     </div>
+
+    <dialog class="app-dialog" id="create-playlist-dialog" aria-labelledby="create-dialog-title">
+      <form id="create-playlist-form">
+        <div class="dialog-heading">
+          <p class="section-kicker">KOLEKSI BARU</p>
+          <h2 id="create-dialog-title">Buat playlist</h2>
+          <p>Beri nama untuk playlist-mu.</p>
+        </div>
+        <label class="dialog-label" for="playlist-name-input">Nama playlist</label>
+        <input class="dialog-input" id="playlist-name-input" name="name" type="text" maxlength="60" placeholder="Contoh: Teman perjalanan" required autocomplete="off">
+        <div class="dialog-actions">
+          <button class="dialog-cancel" id="cancel-create-playlist" type="button">Batal</button>
+          <button class="dialog-submit" type="submit">Buat playlist</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="app-dialog" id="add-tracks-dialog" aria-labelledby="add-tracks-dialog-title">
+      <form id="add-tracks-form">
+        <div class="dialog-heading">
+          <p class="section-kicker">ATUR ISI PLAYLIST</p>
+          <h2 id="add-tracks-dialog-title">Tambah lagu</h2>
+          <p>Pilih lagu yang ingin dimasukkan.</p>
+        </div>
+        <div class="playlist-song-options" id="playlist-song-options"></div>
+        <div class="dialog-actions">
+          <button class="dialog-cancel" id="cancel-add-tracks" type="button">Batal</button>
+          <button class="dialog-submit" type="submit">Simpan pilihan</button>
+        </div>
+      </form>
+    </dialog>
 
     <section class="player-bar" id="player-bar" aria-label="Pemutar musik" hidden>
       <div class="player-track">

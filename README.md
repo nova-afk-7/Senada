@@ -1,6 +1,6 @@
 # Senada — Pemutar Musik Offline
 
-Senada adalah aplikasi web yang dapat dipasang di ponsel. File musik disimpan di penyimpanan lokal browser, tidak dikirim ke server.
+Senada adalah aplikasi web yang dapat dipasang di ponsel. File musik, playlist, dan riwayat putar disimpan di penyimpanan lokal browser, tidak dikirim ke server.
 
 ## Memulai
 
