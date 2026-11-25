@@ -29,10 +29,27 @@
 
       <main>
         <section class="now-playing-screen" id="now-playing-screen" aria-labelledby="playing-page-title" hidden>
-          <button class="back-to-library" id="back-to-library" type="button">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6M9 12h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Kembali ke koleksi
-          </button>
+          <div class="now-playing-toolbar">
+            <button class="back-to-library" id="back-to-library" type="button">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6M9 12h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Kembali ke koleksi
+            </button>
+            <div class="playing-tools">
+              <button class="playing-tools-button" id="playing-tools-button" type="button" aria-label="Opsi pemutaran" aria-controls="playing-tools-menu" aria-expanded="false" hidden>
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+              </button>
+              <div class="playing-tools-menu" id="playing-tools-menu" role="menu" aria-label="Opsi audio" hidden>
+                <button type="button" role="menuitem" data-playing-tool="statistics">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16v-4m0-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  Statistik audio
+                </button>
+                <button type="button" role="menuitem" data-playing-tool="equalizer">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4v16m7-16v16m7-16v16M2 9h6m1 6h6m1-4h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                  Equalizer audio
+                </button>
+              </div>
+            </div>
+          </div>
           <div class="playing-page-content">
             <p class="eyebrow playing-eyebrow"><span class="eyebrow-line"></span> SEDANG DIPUTAR</p>
             <div class="waveform-wrap">
@@ -50,7 +67,7 @@
                 <span id="playing-stat-size"></span>
               </div>
             </div>
-            <section class="equalizer-panel" aria-labelledby="equalizer-title">
+            <section class="equalizer-panel" id="equalizer-panel" aria-labelledby="equalizer-title" hidden>
               <div class="equalizer-header">
                 <div>
                   <p class="section-kicker">SESUAIKAN SUARA</p>
@@ -94,7 +111,41 @@
                   <span>14 kHz</span>
                 </label>
               </div>
-              <p class="equalizer-hint" id="equalizer-hint">Atur tiap frekuensi atau pilih preset. Pengaturan tersimpan di perangkat ini.</p>
+              <div class="sound-effects">
+                <h3>Efek suara</h3>
+                <label class="sound-effect-control">
+                  <span class="sound-effect-label">Balance <output id="balance-value">Seimbang</output></span>
+                  <input id="balance-slider" type="range" min="-100" max="100" step="1" value="0" aria-label="Balance kiri dan kanan">
+                  <span class="sound-effect-range"><span>Kiri</span><span>Kanan</span></span>
+                </label>
+                <label class="sound-effect-control">
+                  <span class="sound-effect-label">Surround virtual <output id="surround-value">0%</output></span>
+                  <input id="surround-slider" type="range" min="0" max="100" step="1" value="0" aria-label="Kekuatan surround virtual">
+                  <span class="sound-effect-range"><span>Normal</span><span>Lebih luas</span></span>
+                </label>
+                <label class="sound-effect-control">
+                  <span class="sound-effect-label">Bass <output id="bass-value">0%</output></span>
+                  <input id="bass-slider" type="range" min="0" max="100" step="1" value="0" aria-label="Kekuatan bass">
+                  <span class="sound-effect-range"><span>Ringan</span><span>Kuat</span></span>
+                </label>
+              </div>
+              <p class="equalizer-hint" id="equalizer-hint">Surround virtual menambah pantulan stereo untuk headphone; bukan keluaran speaker multi-kanal. Pengaturan tersimpan di perangkat ini.</p>
+            </section>
+            <section class="playing-audio-stats" id="audio-stats-panel" aria-label="Statistik audio" hidden>
+              <div class="audio-stats-heading">
+                <div>
+                  <p class="section-kicker">INFORMASI LAGU</p>
+                  <h2>Statistik audio</h2>
+                </div>
+                <button id="close-stats-button" type="button" aria-label="Tutup statistik audio">×</button>
+              </div>
+              <dl class="audio-stats-grid">
+                <div><dt>Format</dt><dd id="stat-format">—</dd></div>
+                <div><dt>Ukuran file</dt><dd id="stat-size">—</dd></div>
+                <div><dt>Durasi</dt><dd id="stat-duration">—</dd></div>
+                <div><dt>Bitrate rata-rata</dt><dd id="stat-bitrate">—</dd></div>
+              </dl>
+              <p>Bitrate adalah perkiraan dari ukuran file dan durasi, bukan pembacaan bitrate setiap bagian lagu.</p>
             </section>
           </div>
         </section>
@@ -267,24 +318,6 @@
           <span class="now-playing-title" id="now-playing-title">Pilih lagu</span>
           <span class="now-playing-subtitle" id="now-playing-subtitle">Disimpan di perangkat</span>
         </button>
-        <button class="stats-toggle" id="stats-toggle" type="button" aria-label="Lihat statistik audio" aria-controls="audio-stats-panel" aria-expanded="false">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M12 16v-4m0-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-      </div>
-      <div class="audio-stats-panel" id="audio-stats-panel" aria-label="Statistik audio" hidden>
-        <div class="audio-stats-heading">
-          <span>STATISTIK AUDIO</span>
-          <button id="close-stats-button" type="button" aria-label="Tutup statistik audio">×</button>
-        </div>
-        <dl class="audio-stats-grid">
-          <div><dt>Format</dt><dd id="stat-format">—</dd></div>
-          <div><dt>Ukuran file</dt><dd id="stat-size">—</dd></div>
-          <div><dt>Durasi</dt><dd id="stat-duration">—</dd></div>
-          <div><dt>Bitrate rata-rata</dt><dd id="stat-bitrate">—</dd></div>
-        </dl>
-        <p>Bitrate adalah perkiraan dari ukuran file dan durasi, bukan pembacaan bitrate setiap bagian lagu.</p>
       </div>
       <div class="player-controls">
         <div class="control-buttons">

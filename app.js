@@ -24,7 +24,9 @@ const playlistDetail = document.querySelector("#playlist-detail");
 const playlistTrackList = document.querySelector("#playlist-track-list");
 const recentTrackList = document.querySelector("#recent-track-list");
 const statsPanel = document.querySelector("#audio-stats-panel");
-const statsToggle = document.querySelector("#stats-toggle");
+const equalizerPanel = document.querySelector("#equalizer-panel");
+const playingToolsButton = document.querySelector("#playing-tools-button");
+const playingToolsMenu = document.querySelector("#playing-tools-menu");
 const appShell = document.querySelector(".app-shell");
 const nowPlayingScreen = document.querySelector("#now-playing-screen");
 const waveformCanvas = document.querySelector("#waveform-canvas");
@@ -49,8 +51,15 @@ let waveformFrame = null;
 let waveformStartedAt = 0;
 let waveformFrequencies = null;
 let equalizerFilters = [];
+let bassFilter = null;
+let balancePanner = null;
+let surroundWetGain = null;
+let surroundDryGain = null;
 let equalizerPreset = "flat";
 let equalizerGains = EQUALIZER_PRESETS.flat.slice();
+let balanceValue = 0;
+let surroundValue = 0;
+let bassValue = 0;
 
 if (googleAccountEmail) {
   document.querySelector("#drive-sync-label").textContent = `Sinkronkan • ${googleAccountEmail}`;
@@ -162,23 +171,49 @@ function updateEqualizer(gains, preset, persist = true) {
   });
   equalizerPreset = preset;
   document.querySelector("#equalizer-preset").value = preset;
-  if (persist) {
-    try {
-      localStorage.setItem(EQUALIZER_STORAGE_KEY, JSON.stringify({
-        preset: equalizerPreset,
-        gains: equalizerGains
-      }));
-    } catch (error) {
-      console.error("Could not save equalizer preferences:", error);
-      showToast(`Pengaturan equalizer gagal disimpan: ${error.message}`, true);
-    }
+  if (persist) persistAudioPreferences();
+}
+
+function updateSoundEffects(nextValues, persist = true) {
+  balanceValue = Math.max(-100, Math.min(100, Number(nextValues.balance) || 0));
+  surroundValue = Math.max(0, Math.min(100, Number(nextValues.surround) || 0));
+  bassValue = Math.max(0, Math.min(100, Number(nextValues.bass) || 0));
+
+  document.querySelector("#balance-slider").value = String(balanceValue);
+  document.querySelector("#balance-value").textContent = balanceValue === 0
+    ? "Seimbang"
+    : `${balanceValue < 0 ? "Kiri" : "Kanan"} ${Math.abs(balanceValue)}%`;
+  document.querySelector("#surround-slider").value = String(surroundValue);
+  document.querySelector("#surround-value").textContent = `${surroundValue}%`;
+  document.querySelector("#bass-slider").value = String(bassValue);
+  document.querySelector("#bass-value").textContent = `${bassValue}%`;
+
+  if (balancePanner) balancePanner.pan.value = balanceValue / 100;
+  if (surroundWetGain) surroundWetGain.gain.value = (surroundValue / 100) * 0.32;
+  if (surroundDryGain) surroundDryGain.gain.value = 1 - (surroundValue / 100) * 0.12;
+  if (bassFilter) bassFilter.gain.value = (bassValue / 100) * 12;
+  if (persist) persistAudioPreferences();
+}
+
+function persistAudioPreferences() {
+  try {
+    localStorage.setItem(EQUALIZER_STORAGE_KEY, JSON.stringify({
+      preset: equalizerPreset,
+      gains: equalizerGains,
+      balance: balanceValue,
+      surround: surroundValue,
+      bass: bassValue
+    }));
+  } catch (error) {
+    console.error("Could not save audio preferences:", error);
+    showToast(`Pengaturan audio gagal disimpan: ${error.message}`, true);
   }
 }
 
 function loadEqualizerPreferences() {
   const audioContextSupported = Boolean(window.AudioContext || window.webkitAudioContext);
   if (!audioContextSupported) {
-    document.querySelectorAll(".equalizer-slider, #equalizer-preset").forEach((control) => {
+    document.querySelectorAll(".equalizer-slider, .sound-effect-control input, #equalizer-preset").forEach((control) => {
       control.disabled = true;
     });
     document.querySelector("#equalizer-hint").textContent =
@@ -201,9 +236,15 @@ function loadEqualizerPreferences() {
       ? parsedPreferences.preset
       : "custom";
     updateEqualizer(parsedPreferences.gains, preset, false);
+    updateSoundEffects({
+      balance: parsedPreferences.balance,
+      surround: parsedPreferences.surround,
+      bass: parsedPreferences.bass
+    }, false);
   } catch (error) {
     console.error("Could not restore equalizer preferences:", error);
     updateEqualizer(EQUALIZER_PRESETS.flat, "flat", false);
+    updateSoundEffects({ balance: 0, surround: 0, bass: 0 }, false);
     showToast(`Preset equalizer tidak dapat dimuat: ${error.message}`, true);
   }
 }
@@ -215,7 +256,28 @@ function setEqualizerPreset(preset) {
 
 function setAudioStatsOpen(isOpen) {
   statsPanel.hidden = !isOpen;
-  statsToggle.setAttribute("aria-expanded", String(isOpen));
+  equalizerPanel.hidden = true;
+}
+
+function closePlayingToolsMenu() {
+  playingToolsMenu.hidden = true;
+  playingToolsButton.setAttribute("aria-expanded", "false");
+}
+
+function setPlayingToolsVisible(isVisible) {
+  playingToolsButton.hidden = !isVisible;
+  if (!isVisible) {
+    closePlayingToolsMenu();
+    if (document.querySelector(".playing-tools").contains(document.activeElement)) {
+      playButton.focus();
+    }
+  }
+}
+
+function showPlayingTool(tool) {
+  closePlayingToolsMenu();
+  statsPanel.hidden = tool !== "statistics";
+  equalizerPanel.hidden = tool !== "equalizer";
 }
 
 function drawWaveform(timestamp = 0) {
@@ -331,17 +393,42 @@ async function connectAudioVisualizer() {
       filter.gain.value = equalizerGains[index];
       return filter;
     });
+    const bass = context.createBiquadFilter();
+    bass.type = "lowshelf";
+    bass.frequency.value = 110;
+    bass.gain.value = (bassValue / 100) * 12;
+
+    const convolver = context.createConvolver();
+    convolver.normalize = false;
+    convolver.buffer = createSurroundImpulse(context);
+    const dryGain = context.createGain();
+    const wetGain = context.createGain();
+    const panner = context.createStereoPanner();
+    dryGain.gain.value = 1 - (surroundValue / 100) * 0.12;
+    wetGain.gain.value = (surroundValue / 100) * 0.32;
+    panner.pan.value = balanceValue / 100;
+
     analyser.fftSize = 256;
     analyser.smoothingTimeConstant = 0.78;
     source.connect(filters[0]);
     filters.forEach((filter, index) => {
-      const nextNode = filters[index + 1] || analyser;
+      const nextNode = filters[index + 1] || bass;
       filter.connect(nextNode);
     });
+    bass.connect(dryGain);
+    bass.connect(convolver);
+    convolver.connect(wetGain);
+    dryGain.connect(panner);
+    wetGain.connect(panner);
+    panner.connect(analyser);
     analyser.connect(context.destination);
     audioContext = context;
     audioAnalyser = analyser;
     equalizerFilters = filters;
+    bassFilter = bass;
+    balancePanner = panner;
+    surroundDryGain = dryGain;
+    surroundWetGain = wetGain;
     waveformFrequencies = new Uint8Array(analyser.frequencyBinCount);
   } catch (error) {
     if (source && context) source.connect(context.destination);
@@ -350,6 +437,11 @@ async function connectAudioVisualizer() {
     audioContext = null;
     audioAnalyser = null;
     waveformFrequencies = null;
+    equalizerFilters = [];
+    bassFilter = null;
+    balancePanner = null;
+    surroundDryGain = null;
+    surroundWetGain = null;
     return;
   }
   if (audioContext.state === "suspended") {
@@ -359,6 +451,25 @@ async function connectAudioVisualizer() {
       console.error("Audio visualizer could not resume:", error);
     }
   }
+}
+
+function createSurroundImpulse(context) {
+  const sampleRate = context.sampleRate;
+  const reflections = [0.018, 0.033, 0.051, 0.074, 0.104, 0.143, 0.19, 0.24];
+  const reflectionLevels = [0.3, 0.23, 0.17, 0.13, 0.09, 0.065, 0.045, 0.025];
+  const buffer = context.createBuffer(2, Math.ceil(sampleRate * 0.28), sampleRate);
+  for (let channel = 0; channel < 2; channel += 1) {
+    const impulse = buffer.getChannelData(channel);
+    impulse[0] = 0.7;
+    reflections.forEach((reflection, index) => {
+      const stereoOffset = channel === 0 ? 0 : 0.006;
+      const sampleIndex = Math.round((reflection + stereoOffset) * sampleRate);
+      if (sampleIndex < impulse.length) {
+        impulse[sampleIndex] = reflectionLevels[index] * (channel === 0 ? 1 : -0.82);
+      }
+    });
+  }
+  return buffer;
 }
 
 function openNowPlayingScreen() {
@@ -801,6 +912,7 @@ function handleTrackEnded() {
   if (queueLength > 1) {
     playAdjacentTrack(1);
   } else {
+    setPlayingToolsVisible(false);
     document.body.classList.remove("is-playing-audio");
   }
 }
@@ -1219,6 +1331,24 @@ document.querySelector("#cancel-add-tracks").addEventListener("click", () => {
 document.querySelector("#add-tracks-form").addEventListener("submit", savePlaylistTracks);
 document.querySelector("#delete-playlist-button").addEventListener("click", deletePlaylist);
 document.querySelector("#drive-sync-button").addEventListener("click", syncWithGoogleDrive);
+playingToolsButton.addEventListener("click", () => {
+  const isOpen = playingToolsMenu.hidden;
+  playingToolsMenu.hidden = !isOpen;
+  playingToolsButton.setAttribute("aria-expanded", String(isOpen));
+});
+playingToolsMenu.querySelectorAll("[data-playing-tool]").forEach((option) => {
+  option.addEventListener("click", () => showPlayingTool(option.dataset.playingTool));
+});
+document.querySelector(".playing-tools").addEventListener("click", (event) => {
+  event.stopPropagation();
+});
+document.addEventListener("click", () => closePlayingToolsMenu());
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !playingToolsMenu.hidden) {
+    closePlayingToolsMenu();
+    playingToolsButton.focus();
+  }
+});
 document.querySelector("#equalizer-preset").addEventListener("change", (event) => {
   if (event.target.value !== "custom") setEqualizerPreset(event.target.value);
 });
@@ -1227,6 +1357,27 @@ document.querySelectorAll(".equalizer-slider").forEach((slider) => {
     const gains = Array.from(document.querySelectorAll(".equalizer-slider"))
       .map((band) => Number(band.value));
     updateEqualizer(gains, "custom");
+  });
+});
+document.querySelector("#balance-slider").addEventListener("input", (event) => {
+  updateSoundEffects({
+    balance: Number(event.target.value),
+    surround: surroundValue,
+    bass: bassValue
+  });
+});
+document.querySelector("#surround-slider").addEventListener("input", (event) => {
+  updateSoundEffects({
+    balance: balanceValue,
+    surround: Number(event.target.value),
+    bass: bassValue
+  });
+});
+document.querySelector("#bass-slider").addEventListener("input", (event) => {
+  updateSoundEffects({
+    balance: balanceValue,
+    surround: surroundValue,
+    bass: Number(event.target.value)
   });
 });
 playButton.addEventListener("click", () => {
@@ -1258,10 +1409,12 @@ document.querySelector("#volume-bar").addEventListener("input", (event) => {
 });
 audio.volume = 0.8;
 audio.addEventListener("play", () => {
+  setPlayingToolsVisible(true);
   document.body.classList.add("is-playing-audio");
   startWaveform();
 });
 audio.addEventListener("pause", () => {
+  setPlayingToolsVisible(false);
   document.body.classList.remove("is-playing-audio");
   stopWaveform();
 });
@@ -1284,9 +1437,6 @@ audio.addEventListener("loadedmetadata", () => {
     transactionDone(transaction).catch((error) => showToast(`Durasi lagu gagal disimpan: ${error.message}`, true));
   }
 });
-statsToggle.addEventListener("click", () => {
-  setAudioStatsOpen(statsPanel.hidden);
-});
 window.addEventListener("popstate", () => {
   if (isNowPlayingOpen) closeNowPlayingScreen(true);
 });
@@ -1295,7 +1445,7 @@ window.addEventListener("resize", () => {
 });
 document.querySelector("#close-stats-button").addEventListener("click", () => {
   setAudioStatsOpen(false);
-  statsToggle.focus();
+  playingToolsButton.focus();
 });
 audio.addEventListener("error", () => {
   if (audio.error) showToast("Format file ini tidak didukung oleh browser.", true);
