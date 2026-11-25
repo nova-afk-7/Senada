@@ -28,6 +28,31 @@
       </header>
 
       <main>
+        <section class="now-playing-screen" id="now-playing-screen" aria-labelledby="playing-page-title" hidden>
+          <button class="back-to-library" id="back-to-library" type="button">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6M9 12h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Kembali ke koleksi
+          </button>
+          <div class="playing-page-content">
+            <p class="eyebrow playing-eyebrow"><span class="eyebrow-line"></span> SEDANG DIPUTAR</p>
+            <div class="waveform-wrap">
+              <canvas id="waveform-canvas" role="img" aria-label="Ilustrasi gelombang audio yang bergerak mengikuti musik"></canvas>
+              <span class="waveform-label"><span class="waveform-live-dot"></span> AUDIO VISUALIZER</span>
+            </div>
+            <div class="playing-track-info">
+              <h1 id="playing-page-title">Pilih lagu</h1>
+              <p id="playing-page-format">Pilih lagu dari koleksimu untuk mulai mendengarkan.</p>
+              <div class="playing-track-stats" id="playing-track-stats" hidden>
+                <span id="playing-stat-format"></span>
+                <span class="playing-stat-divider" aria-hidden="true"></span>
+                <span id="playing-stat-bitrate"></span>
+                <span class="playing-stat-divider" aria-hidden="true"></span>
+                <span id="playing-stat-size"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="welcome-card" aria-labelledby="welcome-title">
           <div class="welcome-copy">
             <p class="eyebrow"><span class="eyebrow-line"></span> RUANG MUSIK PRIBADIMU</p>
@@ -192,10 +217,10 @@
         <div class="mini-art" aria-hidden="true">
           <svg viewBox="0 0 32 32" fill="none"><path d="M12 23V8l12-3v15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="8.5" cy="24" rx="3.5" ry="2.5" stroke="currentColor" stroke-width="2" transform="rotate(-18 8.5 24)"/><ellipse cx="20.5" cy="21" rx="3.5" ry="2.5" stroke="currentColor" stroke-width="2" transform="rotate(-18 20.5 21)"/></svg>
         </div>
-        <div class="now-playing">
+        <button class="now-playing" id="open-now-playing" type="button" aria-label="Buka tampilan lagu yang sedang diputar">
           <span class="now-playing-title" id="now-playing-title">Pilih lagu</span>
           <span class="now-playing-subtitle" id="now-playing-subtitle">Disimpan di perangkat</span>
-        </div>
+        </button>
         <button class="stats-toggle" id="stats-toggle" type="button" aria-label="Lihat statistik audio" aria-controls="audio-stats-panel" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M12 16v-4m0-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>

@@ -18,6 +18,9 @@ const playlistTrackList = document.querySelector("#playlist-track-list");
 const recentTrackList = document.querySelector("#recent-track-list");
 const statsPanel = document.querySelector("#audio-stats-panel");
 const statsToggle = document.querySelector("#stats-toggle");
+const appShell = document.querySelector(".app-shell");
+const nowPlayingScreen = document.querySelector("#now-playing-screen");
+const waveformCanvas = document.querySelector("#waveform-canvas");
 const objectUrls = new Map();
 let database;
 let tracks = [];
@@ -32,6 +35,13 @@ let googleTokenExpiresAt = 0;
 let driveSyncInProgress = false;
 let toastTimer;
 let googleAccountEmail = localStorage.getItem(GOOGLE_ACCOUNT_KEY) || "";
+let isNowPlayingOpen = false;
+let audioContext = null;
+let audioAnalyser = null;
+let waveformFrame = null;
+let waveformStartedAt = 0;
+let waveformFrequencies = null;
+let waveformFallbackNode = null;
 
 if (googleAccountEmail) {
   document.querySelector("#drive-sync-label").textContent = `Sinkronkan • ${googleAccountEmail}`;
@@ -122,11 +132,167 @@ function updateAudioStats(track) {
   document.querySelector("#stat-bitrate").textContent = getEstimatedBitrate(track);
   document.querySelector("#now-playing-subtitle").textContent =
     `${getAudioFormat(track)} · ${getEstimatedBitrate(track)}`;
+  document.querySelector("#playing-page-title").textContent = track.title;
+  document.querySelector("#playing-page-format").textContent =
+    `${getAudioFormat(track)} · ${formatTime(track.duration)} · ${formatSize(track.size)}`;
+  document.querySelector("#playing-stat-format").textContent = getAudioFormat(track);
+  document.querySelector("#playing-stat-bitrate").textContent = getEstimatedBitrate(track);
+  document.querySelector("#playing-stat-size").textContent = formatSize(track.size);
+  document.querySelector("#playing-track-stats").hidden = false;
 }
 
 function setAudioStatsOpen(isOpen) {
   statsPanel.hidden = !isOpen;
   statsToggle.setAttribute("aria-expanded", String(isOpen));
+}
+
+function drawWaveform(timestamp = 0) {
+  const context = waveformCanvas.getContext("2d");
+  const bounds = waveformCanvas.getBoundingClientRect();
+  if (!context || bounds.width === 0 || bounds.height === 0) return;
+
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const canvasWidth = Math.round(bounds.width * pixelRatio);
+  const canvasHeight = Math.round(bounds.height * pixelRatio);
+  if (waveformCanvas.width !== canvasWidth || waveformCanvas.height !== canvasHeight) {
+    waveformCanvas.width = canvasWidth;
+    waveformCanvas.height = canvasHeight;
+  }
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  context.clearRect(0, 0, bounds.width, bounds.height);
+
+  const barCount = 57;
+  const centerY = bounds.height / 2;
+  const maxBarHeight = bounds.height * 0.43;
+  const gap = bounds.width / barCount;
+  const lineWidth = Math.max(1.5, Math.min(3, gap * 0.28));
+  const gradient = context.createLinearGradient(0, 0, bounds.width, 0);
+  gradient.addColorStop(0, "#88ad48");
+  gradient.addColorStop(0.48, "#d0f58a");
+  gradient.addColorStop(1, "#93bb52");
+  context.strokeStyle = gradient;
+  context.lineWidth = lineWidth;
+  context.lineCap = "round";
+
+  if (audioAnalyser) {
+    waveformFrequencies = waveformFrequencies || new Uint8Array(audioAnalyser.frequencyBinCount);
+    audioAnalyser.getByteFrequencyData(waveformFrequencies);
+  }
+
+  for (let index = 0; index < barCount; index += 1) {
+    const position = index / (barCount - 1);
+    const peakOne = Math.exp(-Math.pow((position - 0.23) / 0.14, 2)) * 0.48;
+    const peakTwo = Math.exp(-Math.pow((position - 0.49) / 0.075, 2)) * 0.78;
+    const peakThree = Math.exp(-Math.pow((position - 0.78) / 0.13, 2)) * 0.42;
+    const envelope = Math.min(1, 0.11 + peakOne + peakTwo + peakThree);
+    const frequencyIndex = waveformFrequencies
+      ? Math.min(waveformFrequencies.length - 1, Math.floor(position * waveformFrequencies.length * 0.7))
+      : 0;
+    const audioLevel = waveformFrequencies
+      ? waveformFrequencies[frequencyIndex] / 255
+      : 0;
+    const fallbackPulse = audio.paused
+      ? 0
+      : (Math.sin(timestamp / 175 + index * 0.34) + 1) * 0.12;
+    const height = Math.max(5, maxBarHeight * envelope * (0.62 + audioLevel * 0.75 + fallbackPulse));
+    const x = gap * index + gap / 2;
+    context.beginPath();
+    context.moveTo(x, centerY - height);
+    context.lineTo(x, centerY + height);
+    context.stroke();
+  }
+}
+
+function animateWaveform(timestamp) {
+  if (!isNowPlayingOpen) {
+    waveformFrame = null;
+    return;
+  }
+  drawWaveform(timestamp - waveformStartedAt);
+  if (!audio.paused) {
+    waveformFrame = window.requestAnimationFrame(animateWaveform);
+  } else {
+    waveformFrame = null;
+  }
+}
+
+function startWaveform() {
+  if (waveformFrame !== null || !isNowPlayingOpen) return;
+  waveformStartedAt = performance.now();
+  waveformFrame = window.requestAnimationFrame(animateWaveform);
+}
+
+function stopWaveform() {
+  if (waveformFrame !== null) {
+    window.cancelAnimationFrame(waveformFrame);
+    waveformFrame = null;
+  }
+  drawWaveform();
+}
+
+async function connectAudioVisualizer() {
+  if (audioAnalyser) {
+    if (audioContext.state === "suspended") await audioContext.resume();
+    return;
+  }
+  const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextConstructor) return;
+
+  let context;
+  let source;
+  try {
+    context = new AudioContextConstructor();
+    source = context.createMediaElementSource(audio);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.78;
+    source.connect(analyser);
+    analyser.connect(context.destination);
+    audioContext = context;
+    audioAnalyser = analyser;
+    waveformFrequencies = new Uint8Array(analyser.frequencyBinCount);
+  } catch (error) {
+    if (source && context) source.connect(context.destination);
+    if (context) await context.close();
+    console.error("Audio visualizer unavailable:", error);
+    audioContext = null;
+    audioAnalyser = null;
+    waveformFrequencies = null;
+    return;
+  }
+  if (audioContext.state === "suspended") {
+    try {
+      await audioContext.resume();
+    } catch (error) {
+      console.error("Audio visualizer could not resume:", error);
+    }
+  }
+}
+
+function openNowPlayingScreen() {
+  if (!isNowPlayingOpen) {
+    const currentState = history.state && typeof history.state === "object"
+      ? history.state
+      : {};
+    history.pushState({ ...currentState, senadaNowPlaying: true }, "", "#now-playing");
+    isNowPlayingOpen = true;
+  }
+  nowPlayingScreen.hidden = false;
+  appShell.classList.add("now-playing-open");
+  drawWaveform();
+  if (!audio.paused) startWaveform();
+}
+
+function closeNowPlayingScreen(fromHistory = false) {
+  if (!isNowPlayingOpen) return;
+  if (!fromHistory && history.state && history.state.senadaNowPlaying) {
+    history.back();
+    return;
+  }
+  isNowPlayingOpen = false;
+  nowPlayingScreen.hidden = true;
+  appShell.classList.remove("now-playing-open");
+  stopWaveform();
 }
 
 function titleFromFilename(filename) {
@@ -512,6 +678,9 @@ function playTrack(track, playlistId = null) {
   audio.src = getObjectUrl(track);
   audio.play().then(async () => {
     document.body.classList.add("is-playing-audio");
+    openNowPlayingScreen();
+    await connectAudioVisualizer();
+    startWaveform();
     await recordRecentlyPlayed(track);
     renderAll();
   }).catch((error) => {
@@ -580,6 +749,7 @@ async function removeTrack(track) {
       playbackPlaylistId = null;
       playerBar.hidden = true;
       document.body.classList.remove("is-playing-audio");
+      closeNowPlayingScreen();
     }
     renderAll();
     showToast(`“${track.title}” dihapus dari perangkat.`);
@@ -959,11 +1129,20 @@ document.querySelector("#delete-playlist-button").addEventListener("click", dele
 document.querySelector("#drive-sync-button").addEventListener("click", syncWithGoogleDrive);
 playButton.addEventListener("click", () => {
   if (audio.paused) {
-    audio.play().then(() => document.body.classList.add("is-playing-audio"))
+    audio.play().then(async () => {
+      document.body.classList.add("is-playing-audio");
+      openNowPlayingScreen();
+      await connectAudioVisualizer();
+      startWaveform();
+    })
       .catch((error) => showToast(`Lagu tidak dapat diputar: ${error.message}`, true));
   } else {
     audio.pause();
   }
+});
+document.querySelector("#back-to-library").addEventListener("click", () => closeNowPlayingScreen());
+document.querySelector("#open-now-playing").addEventListener("click", () => {
+  if (currentTrackId) openNowPlayingScreen();
 });
 document.querySelector("#previous-button").addEventListener("click", () => playAdjacentTrack(-1));
 document.querySelector("#next-button").addEventListener("click", () => playAdjacentTrack(1));
@@ -976,8 +1155,14 @@ document.querySelector("#volume-bar").addEventListener("input", (event) => {
   audio.volume = Number(event.target.value);
 });
 audio.volume = 0.8;
-audio.addEventListener("play", () => document.body.classList.add("is-playing-audio"));
-audio.addEventListener("pause", () => document.body.classList.remove("is-playing-audio"));
+audio.addEventListener("play", () => {
+  document.body.classList.add("is-playing-audio");
+  startWaveform();
+});
+audio.addEventListener("pause", () => {
+  document.body.classList.remove("is-playing-audio");
+  stopWaveform();
+});
 audio.addEventListener("ended", handleTrackEnded);
 audio.addEventListener("timeupdate", () => {
   document.querySelector("#current-time").textContent = formatTime(audio.currentTime);
@@ -999,6 +1184,12 @@ audio.addEventListener("loadedmetadata", () => {
 });
 statsToggle.addEventListener("click", () => {
   setAudioStatsOpen(statsPanel.hidden);
+});
+window.addEventListener("popstate", () => {
+  if (isNowPlayingOpen) closeNowPlayingScreen(true);
+});
+window.addEventListener("resize", () => {
+  if (isNowPlayingOpen) drawWaveform();
 });
 document.querySelector("#close-stats-button").addEventListener("click", () => {
   setAudioStatsOpen(false);

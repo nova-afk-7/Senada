@@ -92,6 +92,27 @@ button { color: inherit; }
 
 main { padding-top: 37px; }
 
+.app-shell.now-playing-open main > :not(.now-playing-screen) { display: none; }
+.app-shell.now-playing-open .footer { display: none; }
+.now-playing-screen { min-height: calc(100vh - 84px - 37px - 110px); flex-direction: column; padding: 21px 0 32px; }
+.now-playing-screen:not([hidden]) { display: flex; }
+.back-to-library { display: inline-flex; min-height: 36px; width: fit-content; align-items: center; gap: 7px; padding: 0 11px; color: #a3aca1; border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 255, 255, .025); cursor: pointer; font-size: 10px; font-weight: 600; transition: background .18s ease, color .18s ease; }
+.back-to-library:hover { color: var(--text); background: rgba(255, 255, 255, .06); }
+.back-to-library svg { width: 16px; height: 16px; }
+.playing-page-content { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; padding: 12px 0 8px; text-align: center; }
+.playing-eyebrow { justify-content: center; color: #9faa97; }
+.waveform-wrap { position: relative; display: flex; width: min(760px, 100%); align-items: center; justify-content: center; margin: 20px 0 10px; padding: 0 9px 24px; }
+#waveform-canvas { display: block; width: 100%; height: clamp(150px, 24vw, 245px); overflow: visible; }
+.waveform-label { position: absolute; bottom: 1px; display: flex; align-items: center; gap: 7px; color: #84907e; font-size: 8px; font-weight: 600; letter-spacing: 1.55px; }
+.waveform-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 9px rgba(196, 240, 107, .55); }
+.is-playing-audio .waveform-live-dot { animation: waveform-blink 1.2s ease-in-out infinite; }
+@keyframes waveform-blink { 50% { opacity: .35; box-shadow: 0 0 2px rgba(196, 240, 107, .25); } }
+.playing-track-info { max-width: min(100%, 620px); margin-top: 8px; }
+#playing-page-title { overflow-wrap: anywhere; margin: 0; font: 700 clamp(25px, 4vw, 36px)/1.2 "Manrope", "Segoe UI", sans-serif; letter-spacing: -1.1px; }
+#playing-page-format { margin: 8px 0 0; color: #929b90; font-size: 11px; }
+.playing-track-stats { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 9px; margin-top: 17px; color: #c1ccba; font-size: 9px; font-weight: 600; }
+.playing-stat-divider { width: 3px; height: 3px; border-radius: 50%; background: #707b6d; }
+
 .welcome-card {
   position: relative;
   display: flex;
@@ -383,7 +404,8 @@ h2 {
 .player-track { display: flex; min-width: 0; align-items: center; gap: 9px; }
 .mini-art { display: grid; width: 43px; height: 43px; flex: 0 0 auto; place-items: center; color: var(--accent); border: 1px solid rgba(196, 240, 107, .15); border-radius: 10px; background: #252b23; }
 .mini-art svg { width: 25px; height: 25px; }
-.now-playing { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.now-playing { display: flex; min-width: 0; flex-direction: column; gap: 5px; padding: 0; text-align: left; border: 0; background: transparent; cursor: pointer; }
+.now-playing:focus-visible { outline: 2px solid rgba(196, 240, 107, .65); outline-offset: 4px; }
 .now-playing-title { overflow: hidden; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .now-playing-subtitle { color: #838b82; font-size: 9px; }
 .stats-toggle { display: grid; width: 27px; height: 27px; flex: 0 0 auto; place-items: center; color: #91998f; border: 1px solid transparent; border-radius: 50%; background: transparent; cursor: pointer; }
@@ -447,6 +469,14 @@ h2 {
   .brand-mark { width: 32px; height: 32px; }
   .connection-pill { min-height: 29px; padding: 0 9px; font-size: 10px; }
   main { padding-top: 20px; }
+  .now-playing-screen { min-height: calc(100dvh - 70px - 20px - 135px); padding: 13px 0 20px; }
+  .back-to-library { min-height: 34px; font-size: 9px; }
+  .playing-page-content { padding: 8px 0 6px; }
+  .waveform-wrap { margin: 14px 0 8px; padding-bottom: 22px; }
+  #waveform-canvas { height: clamp(145px, 46vw, 205px); }
+  .playing-track-info { margin-top: 7px; }
+  #playing-page-title { font-size: clamp(24px, 7vw, 32px); }
+  .playing-track-stats { gap: 7px; margin-top: 13px; font-size: 8px; }
   .welcome-card { min-height: 345px; align-items: start; padding: 30px 24px; }
   .welcome-copy { width: 100%; }
   h1 { margin-top: 15px; font-size: clamp(32px, 9vw, 42px); }
