@@ -194,8 +194,26 @@
         </div>
         <div class="now-playing">
           <span class="now-playing-title" id="now-playing-title">Pilih lagu</span>
-          <span class="now-playing-subtitle">Disimpan di perangkat</span>
+          <span class="now-playing-subtitle" id="now-playing-subtitle">Disimpan di perangkat</span>
         </div>
+        <button class="stats-toggle" id="stats-toggle" type="button" aria-label="Lihat statistik audio" aria-controls="audio-stats-panel" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 16v-4m0-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="audio-stats-panel" id="audio-stats-panel" aria-label="Statistik audio" hidden>
+        <div class="audio-stats-heading">
+          <span>STATISTIK AUDIO</span>
+          <button id="close-stats-button" type="button" aria-label="Tutup statistik audio">×</button>
+        </div>
+        <dl class="audio-stats-grid">
+          <div><dt>Format</dt><dd id="stat-format">—</dd></div>
+          <div><dt>Ukuran file</dt><dd id="stat-size">—</dd></div>
+          <div><dt>Durasi</dt><dd id="stat-duration">—</dd></div>
+          <div><dt>Bitrate rata-rata</dt><dd id="stat-bitrate">—</dd></div>
+        </dl>
+        <p>Bitrate adalah perkiraan dari ukuran file dan durasi, bukan pembacaan bitrate setiap bagian lagu.</p>
       </div>
       <div class="player-controls">
         <div class="control-buttons">

@@ -16,6 +16,8 @@ const playlistGrid = document.querySelector("#playlist-grid");
 const playlistDetail = document.querySelector("#playlist-detail");
 const playlistTrackList = document.querySelector("#playlist-track-list");
 const recentTrackList = document.querySelector("#recent-track-list");
+const statsPanel = document.querySelector("#audio-stats-panel");
+const statsToggle = document.querySelector("#stats-toggle");
 const objectUrls = new Map();
 let database;
 let tracks = [];
@@ -94,6 +96,37 @@ function formatTime(seconds) {
 function formatSize(bytes) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getAudioFormat(track) {
+  const extension = track.file && track.file.name.match(/\.([^.]+)$/);
+  if (extension) return extension[1].toUpperCase();
+  const mimeSubtype = track.file && track.file.type.split("/")[1];
+  return mimeSubtype ? mimeSubtype.replace(/^x-/, "").toUpperCase() : "Tidak diketahui";
+}
+
+function getEstimatedBitrate(track) {
+  if (!track.duration || !Number.isFinite(track.duration) || track.duration <= 0 || !track.size) {
+    return "Belum tersedia";
+  }
+  const kilobitsPerSecond = Math.round((track.size * 8) / track.duration / 1000);
+  return `~${kilobitsPerSecond} kbps`;
+}
+
+function updateAudioStats(track) {
+  document.querySelector("#stat-format").textContent = getAudioFormat(track);
+  document.querySelector("#stat-size").textContent = formatSize(track.size);
+  document.querySelector("#stat-duration").textContent = track.duration
+    ? formatTime(track.duration)
+    : "Memuat...";
+  document.querySelector("#stat-bitrate").textContent = getEstimatedBitrate(track);
+  document.querySelector("#now-playing-subtitle").textContent =
+    `${getAudioFormat(track)} · ${getEstimatedBitrate(track)}`;
+}
+
+function setAudioStatsOpen(isOpen) {
+  statsPanel.hidden = !isOpen;
+  statsToggle.setAttribute("aria-expanded", String(isOpen));
 }
 
 function titleFromFilename(filename) {
@@ -475,6 +508,7 @@ function playTrack(track, playlistId = null) {
   playbackPlaylistId = playlistId;
   playerBar.hidden = false;
   document.querySelector("#now-playing-title").textContent = track.title;
+  updateAudioStats(track);
   audio.src = getObjectUrl(track);
   audio.play().then(async () => {
     document.body.classList.add("is-playing-audio");
@@ -956,11 +990,19 @@ audio.addEventListener("loadedmetadata", () => {
   const currentTrack = tracks.find((track) => track.id === currentTrackId);
   if (currentTrack && Number.isFinite(audio.duration)) {
     currentTrack.duration = audio.duration;
+    updateAudioStats(currentTrack);
     renderAll();
     const transaction = database.transaction("tracks", "readwrite");
     transaction.objectStore("tracks").put(currentTrack);
     transactionDone(transaction).catch((error) => showToast(`Durasi lagu gagal disimpan: ${error.message}`, true));
   }
+});
+statsToggle.addEventListener("click", () => {
+  setAudioStatsOpen(statsPanel.hidden);
+});
+document.querySelector("#close-stats-button").addEventListener("click", () => {
+  setAudioStatsOpen(false);
+  statsToggle.focus();
 });
 audio.addEventListener("error", () => {
   if (audio.error) showToast("Format file ini tidak didukung oleh browser.", true);

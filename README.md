@@ -28,4 +28,6 @@ Sinkronisasi perlu internet. Setelah proses selesai, setiap perangkat menyimpan 
 
 Sinkronisasi menggabungkan lagu, playlist, dan riwayat di perangkat dengan cadangan Drive; penghapusan lagu/playlist juga diterapkan di perangkat lain setelah sinkronisasi. Senada memeriksa alamat Gmail agar perangkat tidak tersambung tanpa sengaja ke akun berbeda. Sinkronkan perangkat satu per satu saat online, bukan bersamaan, agar perubahan terbaru tidak saling menimpa. Jika cadangan berisi banyak atau berkas audio besar, proses unggah/unduh memerlukan waktu dan kuota Drive.
 
+Saat lagu diputar, tekan ikon informasi pada pemutar untuk melihat format, ukuran file, durasi, dan perkiraan bitrate rata-rata. Bitrate dihitung dari ukuran file dibagi durasi, sehingga dapat berbeda dari bitrate asli tiap bagian lagu—terutama untuk audio variable bitrate.
+
 Service worker membutuhkan HTTPS (atau `localhost`). Membuka `index.html` sebagai file biasa tidak mengaktifkan mode offline. Tanpa Client ID Google yang dikonfigurasi, fitur pemutar musik lokal tetap bisa digunakan, tetapi sinkronisasi Drive belum aktif.
