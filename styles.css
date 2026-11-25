@@ -395,20 +395,24 @@ h2 {
   grid-template-columns: minmax(0, 1fr) 70px 36px;
   align-items: center;
   gap: 18px;
+  min-width: 0;
   padding: 0 17px;
   border-bottom: 1px solid var(--line);
   transition: background .18s ease;
 }
 
+.track-row.without-remove { grid-template-columns: minmax(0, 1fr) 70px; }
+
 .track-row:last-child { border-bottom: 0; }
 .track-row:hover, .track-row.is-playing { background: rgba(196, 240, 107, .035); }
 
-.track-main { display: flex; min-width: 0; align-items: center; gap: 13px; padding: 0; text-align: left; border: 0; background: transparent; cursor: pointer; }
+.track-main { display: flex; width: 100%; min-width: 0; align-items: center; gap: 13px; overflow: hidden; padding: 0; text-align: left; border: 0; background: transparent; cursor: pointer; }
 .track-art { display: grid; width: 39px; height: 39px; flex: 0 0 auto; place-items: center; color: #b9d985; border: 1px solid rgba(196, 240, 107, .09); border-radius: 9px; background: #252b23; }
 .track-art svg { width: 21px; height: 21px; }
-.track-name { overflow: hidden; color: #e7eae3; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.track-meta { overflow: hidden; margin-top: 4px; color: #838b82; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.track-duration { color: #8b938a; font-size: 10px; text-align: right; }
+.track-text { display: block; min-width: 0; flex: 1; }
+.track-name { display: block; max-width: 100%; overflow: hidden; color: #e7eae3; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.track-meta { display: block; max-width: 100%; overflow: hidden; margin-top: 4px; color: #838b82; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.track-duration { min-width: 0; color: #8b938a; font-size: 10px; text-align: right; white-space: nowrap; }
 .remove-button, .icon-button { display: grid; width: 34px; height: 34px; place-items: center; color: #747d74; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
 .remove-button:hover { color: #ff9a8f; background: rgba(255, 116, 98, .08); }
 .remove-button svg { width: 17px; height: 17px; }
@@ -567,6 +571,7 @@ h2 {
   .playlist-delete-button { width: 30px; height: 31px; }
   .app-dialog { padding: 20px; }
   .track-row { min-height: 64px; grid-template-columns: minmax(0, 1fr) 43px 31px; gap: 9px; padding: 0 10px; }
+  .track-row.without-remove { grid-template-columns: minmax(0, 1fr) 43px; }
   .track-main { gap: 10px; }
   .track-art { width: 36px; height: 36px; }
   .track-name { font-size: 11px; }

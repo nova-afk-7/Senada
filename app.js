@@ -586,6 +586,7 @@ function createTrackRow(track, options = {}) {
     removeButton.addEventListener("click", options.onRemove);
   } else if (options.hideRemove) {
     removeButton.remove();
+    row.classList.add("without-remove");
   } else {
     removeButton.addEventListener("click", () => removeTrack(track));
   }
