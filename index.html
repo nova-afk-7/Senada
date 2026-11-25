@@ -339,6 +339,29 @@
         </div>
       </div>
       <div class="player-volume">
+        <div class="shuffle-control">
+          <button class="shuffle-button" id="shuffle-button" type="button" aria-label="Mode urutan musik: Urutan" aria-expanded="false" aria-controls="shuffle-menu" title="Urutan">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 4l3 3-3 3M3 7h3.3c4.5 0 4.9 10 9.7 10H21M18 14l3 3-3 3M3 17h3.3c1.6 0 2.7-1.2 3.7-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="shuffle-menu" id="shuffle-menu" role="menu" aria-label="Mode urutan musik" hidden>
+            <button type="button" role="menuitemradio" aria-checked="true" data-playback-mode="sequential">
+              <span class="shuffle-menu-icon">1</span>
+              <span><strong>Urutan</strong><small>Urutan lagu dari atas</small></span>
+            </button>
+            <button type="button" role="menuitemradio" aria-checked="false" data-playback-mode="shuffle">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 4l3 3-3 3M3 7h3.3c4.5 0 4.9 10 9.7 10H21M18 14l3 3-3 3M3 17h3.3c1.6 0 2.7-1.2 3.7-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span><strong>Acak</strong><small>Urutan lagu dipilih secara acak</small></span>
+            </button>
+            <button type="button" role="menuitemradio" aria-checked="false" data-playback-mode="repeat">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4m14-1v2a3 3 0 0 1-3 3H3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span><strong>Pengulangan</strong><small>Ulangi lagu yang sedang diputar</small></span>
+            </button>
+            <button type="button" role="menuitemradio" aria-checked="false" data-playback-mode="smart">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Zm7 12 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span><strong>Smart Shuffle</strong><small>Acak cerdas, hindari lagu berulang</small></span>
+            </button>
+          </div>
+        </div>
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4H4Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 9a5 5 0 0 1 0 6m2-8a8 8 0 0 1 0 10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
         <input id="volume-bar" class="volume-bar" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Volume">
       </div>

@@ -472,6 +472,19 @@ h2 {
 .player-volume { display: flex; align-items: center; justify-content: end; gap: 9px; color: #8c948b; }
 .player-volume svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .volume-bar { width: 93px; }
+.shuffle-control { position: relative; }
+.shuffle-button { display: grid; width: 30px; height: 30px; place-items: center; color: #8c948b; border: 1px solid transparent; border-radius: 50%; background: transparent; cursor: pointer; }
+.shuffle-button svg { width: 18px; height: 18px; }
+.shuffle-button:hover, .shuffle-button[aria-expanded="true"], .shuffle-button.is-active { color: var(--accent); border-color: rgba(196, 240, 107, .22); background: rgba(196, 240, 107, .07); }
+.shuffle-button:focus-visible { outline: 2px solid rgba(196, 240, 107, .5); outline-offset: 2px; }
+.shuffle-menu { position: absolute; right: 0; bottom: calc(100% + 10px); width: 218px; padding: 5px; border: 1px solid rgba(235, 244, 233, .12); border-radius: 11px; background: #202520; box-shadow: 0 16px 36px rgba(0, 0, 0, .42); }
+.shuffle-menu button { display: grid; width: 100%; min-height: 52px; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 7px; padding: 7px 8px; color: #cbd5c6; text-align: left; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+.shuffle-menu button:hover, .shuffle-menu button:focus-visible, .shuffle-menu button[aria-checked="true"] { color: var(--accent); outline: 0; background: rgba(196, 240, 107, .07); }
+.shuffle-menu button > svg { width: 18px; height: 18px; justify-self: center; }
+.shuffle-menu-icon { display: grid; width: 20px; height: 20px; place-items: center; justify-self: center; border: 1px solid currentColor; border-radius: 50%; font-size: 9px; font-weight: 700; }
+.shuffle-menu button span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.shuffle-menu strong { font-size: 10px; }
+.shuffle-menu small { color: #919b8e; font-size: 8px; line-height: 1.25; }
 
 .toast {
   position: fixed;
@@ -575,7 +588,7 @@ h2 {
   .secondary-control svg { width: 17px; height: 17px; }
   .play-button { width: 34px; height: 34px; }
   .progress-row { grid-column: 1 / -1; grid-row: 2; margin-top: 10px; gap: 8px; }
-  .player-volume { display: none; }
+  .player-volume { grid-column: 1 / -1; grid-row: 3; width: 100%; justify-content: flex-end; margin-top: 7px; }
   .toast { right: 14px; bottom: 143px; max-width: calc(100vw - 28px); }
 }
 

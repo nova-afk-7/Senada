@@ -5,6 +5,7 @@ const DRIVE_SCOPE = "openid email https://www.googleapis.com/auth/drive.appdata"
 const BACKUP_MAGIC = "SENADA1\n";
 const GOOGLE_ACCOUNT_KEY = "senada-google-account";
 const EQUALIZER_STORAGE_KEY = "senada-equalizer";
+const PLAYBACK_MODE_KEY = "senada-playback-mode";
 const EQUALIZER_PRESETS = {
   flat: [0, 0, 0, 0, 0],
   bass: [6, 4, 0, 1, 2],
@@ -60,6 +61,10 @@ let equalizerGains = EQUALIZER_PRESETS.flat.slice();
 let balanceValue = 0;
 let surroundValue = 0;
 let bassValue = 0;
+let playbackMode = "sequential";
+let smartShuffleHistory = [];
+
+const validPlaybackModes = ["sequential", "shuffle", "repeat", "smart"];
 
 if (googleAccountEmail) {
   document.querySelector("#drive-sync-label").textContent = `Sinkronkan • ${googleAccountEmail}`;
@@ -247,6 +252,53 @@ function loadEqualizerPreferences() {
     updateSoundEffects({ balance: 0, surround: 0, bass: 0 }, false);
     showToast(`Preset equalizer tidak dapat dimuat: ${error.message}`, true);
   }
+}
+
+function loadPlaybackMode() {
+  const savedMode = localStorage.getItem(PLAYBACK_MODE_KEY);
+  playbackMode = validPlaybackModes.includes(savedMode) ? savedMode : "sequential";
+  updatePlaybackModeUi();
+}
+
+function updatePlaybackModeUi() {
+  const labels = {
+    sequential: "Urutan",
+    shuffle: "Acak",
+    repeat: "Pengulangan",
+    smart: "Smart Shuffle"
+  };
+  const shuffleButton = document.querySelector("#shuffle-button");
+  shuffleButton.setAttribute("aria-label", `Mode urutan musik: ${labels[playbackMode]}`);
+  shuffleButton.title = labels[playbackMode];
+  shuffleButton.classList.toggle("is-active", playbackMode !== "sequential");
+  document.querySelectorAll("[data-playback-mode]").forEach((option) => {
+    option.setAttribute("aria-checked", String(option.dataset.playbackMode === playbackMode));
+  });
+}
+
+function setPlaybackMode(mode) {
+  if (!validPlaybackModes.includes(mode)) return;
+  playbackMode = mode;
+  smartShuffleHistory = [];
+  try {
+    localStorage.setItem(PLAYBACK_MODE_KEY, mode);
+  } catch (error) {
+    console.error("Could not save playback mode:", error);
+  }
+  updatePlaybackModeUi();
+  closeShuffleMenu();
+  const labels = {
+    sequential: "Urutan lagu aktif",
+    shuffle: "Urutan acak aktif",
+    repeat: "Pengulangan lagu aktif",
+    smart: "Smart Shuffle aktif"
+  };
+  showToast(labels[mode]);
+}
+
+function closeShuffleMenu() {
+  document.querySelector("#shuffle-menu").hidden = true;
+  document.querySelector("#shuffle-button").setAttribute("aria-expanded", "false");
 }
 
 function setEqualizerPreset(preset) {
@@ -874,6 +926,10 @@ async function recordRecentlyPlayed(track) {
 
 function playTrack(track, playlistId = null) {
   currentTrackId = track.id;
+  if (playbackMode === "smart") {
+    smartShuffleHistory = smartShuffleHistory.filter((trackId) => trackId !== track.id);
+    smartShuffleHistory.push(track.id);
+  }
   playbackPlaylistId = playlistId;
   playerBar.hidden = false;
   document.querySelector("#now-playing-title").textContent = track.title;
@@ -899,16 +955,41 @@ function playAdjacentTrack(direction) {
     ? playlist.trackIds.map((trackId) => tracks.find((track) => track.id === trackId)).filter(Boolean)
     : tracks;
   if (queue.length === 0) return;
+  if (playbackMode === "repeat") {
+    const currentTrack = queue.find((track) => track.id === currentTrackId);
+    if (currentTrack) playTrack(currentTrack, playlist ? playlist.id : null);
+    return;
+  }
   const currentIndex = queue.findIndex((track) => track.id === currentTrackId);
-  const nextIndex = currentIndex < 0
-    ? 0
-    : (currentIndex + direction + queue.length) % queue.length;
+  let nextIndex;
+  if (playbackMode === "shuffle" || playbackMode === "smart") {
+    let candidates = queue
+      .map((track, index) => ({ track, index }))
+      .filter((item) => item.track.id !== currentTrackId);
+    if (playbackMode === "smart") {
+      const unplayedCandidates = candidates.filter((item) => !smartShuffleHistory.includes(item.track.id));
+      if (unplayedCandidates.length > 0) candidates = unplayedCandidates;
+    }
+    if (candidates.length === 0) {
+      nextIndex = currentIndex < 0 ? 0 : currentIndex;
+    } else {
+      nextIndex = candidates[Math.floor(Math.random() * candidates.length)].index;
+    }
+  } else {
+    nextIndex = currentIndex < 0
+      ? 0
+      : (currentIndex + direction + queue.length) % queue.length;
+  }
   playTrack(queue[nextIndex], playlist ? playlist.id : null);
 }
 
 function handleTrackEnded() {
   const playlist = playlists.find((item) => item.id === playbackPlaylistId);
   const queueLength = playlist ? playlist.trackIds.length : tracks.length;
+  if (playbackMode === "repeat") {
+    playAdjacentTrack(1);
+    return;
+  }
   if (queueLength > 1) {
     playAdjacentTrack(1);
   } else {
@@ -1331,6 +1412,20 @@ document.querySelector("#cancel-add-tracks").addEventListener("click", () => {
 document.querySelector("#add-tracks-form").addEventListener("submit", savePlaylistTracks);
 document.querySelector("#delete-playlist-button").addEventListener("click", deletePlaylist);
 document.querySelector("#drive-sync-button").addEventListener("click", syncWithGoogleDrive);
+const shuffleButton = document.querySelector("#shuffle-button");
+shuffleButton.addEventListener("click", () => {
+  const menu = document.querySelector("#shuffle-menu");
+  menu.hidden = !menu.hidden;
+  shuffleButton.setAttribute("aria-expanded", String(!menu.hidden));
+});
+document.querySelectorAll("[data-playback-mode]").forEach((option) => {
+  option.addEventListener("click", () => setPlaybackMode(option.dataset.playbackMode));
+});
+document.querySelector(".shuffle-control").addEventListener("click", (event) => event.stopPropagation());
+document.addEventListener("click", closeShuffleMenu);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeShuffleMenu();
+});
 playingToolsButton.addEventListener("click", () => {
   const isOpen = playingToolsMenu.hidden;
   playingToolsMenu.hidden = !isOpen;
@@ -1456,6 +1551,7 @@ window.addEventListener("offline", updateConnectionStatus);
 async function startApp() {
   updateConnectionStatus();
   loadEqualizerPreferences();
+  loadPlaybackMode();
   try {
     database = await openDatabase();
     await loadLibrary();
