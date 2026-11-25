@@ -50,6 +50,52 @@
                 <span id="playing-stat-size"></span>
               </div>
             </div>
+            <section class="equalizer-panel" aria-labelledby="equalizer-title">
+              <div class="equalizer-header">
+                <div>
+                  <p class="section-kicker">SESUAIKAN SUARA</p>
+                  <h2 id="equalizer-title">Equalizer audio</h2>
+                </div>
+                <label class="equalizer-preset-label">
+                  <span class="sr-only">Preset equalizer</span>
+                  <select id="equalizer-preset" aria-label="Preset equalizer">
+                    <option value="flat">Flat</option>
+                    <option value="bass">Bass boost</option>
+                    <option value="vocal">Vokal</option>
+                    <option value="treble">Treble</option>
+                    <option value="custom">Kustom</option>
+                  </select>
+                </label>
+              </div>
+              <div class="equalizer-bands" id="equalizer-bands">
+                <label class="equalizer-band">
+                  <output id="eq-value-0">0 dB</output>
+                  <input class="equalizer-slider" type="range" min="-12" max="12" step="1" value="0" data-band="0" aria-label="Equalizer 60 Hz">
+                  <span>60 Hz</span>
+                </label>
+                <label class="equalizer-band">
+                  <output id="eq-value-1">0 dB</output>
+                  <input class="equalizer-slider" type="range" min="-12" max="12" step="1" value="0" data-band="1" aria-label="Equalizer 230 Hz">
+                  <span>230 Hz</span>
+                </label>
+                <label class="equalizer-band">
+                  <output id="eq-value-2">0 dB</output>
+                  <input class="equalizer-slider" type="range" min="-12" max="12" step="1" value="0" data-band="2" aria-label="Equalizer 910 Hz">
+                  <span>910 Hz</span>
+                </label>
+                <label class="equalizer-band">
+                  <output id="eq-value-3">0 dB</output>
+                  <input class="equalizer-slider" type="range" min="-12" max="12" step="1" value="0" data-band="3" aria-label="Equalizer 3.6 kHz">
+                  <span>3.6 kHz</span>
+                </label>
+                <label class="equalizer-band">
+                  <output id="eq-value-4">0 dB</output>
+                  <input class="equalizer-slider" type="range" min="-12" max="12" step="1" value="0" data-band="4" aria-label="Equalizer 14 kHz">
+                  <span>14 kHz</span>
+                </label>
+              </div>
+              <p class="equalizer-hint" id="equalizer-hint">Atur tiap frekuensi atau pilih preset. Pengaturan tersimpan di perangkat ini.</p>
+            </section>
           </div>
         </section>
 

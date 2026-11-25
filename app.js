@@ -4,6 +4,13 @@ const DRIVE_BACKUP_NAME = "senada-library-v1";
 const DRIVE_SCOPE = "openid email https://www.googleapis.com/auth/drive.appdata";
 const BACKUP_MAGIC = "SENADA1\n";
 const GOOGLE_ACCOUNT_KEY = "senada-google-account";
+const EQUALIZER_STORAGE_KEY = "senada-equalizer";
+const EQUALIZER_PRESETS = {
+  flat: [0, 0, 0, 0, 0],
+  bass: [6, 4, 0, 1, 2],
+  vocal: [-2, 1, 4, 3, 0],
+  treble: [-1, 0, 0, 4, 6]
+};
 const audio = document.querySelector("#audio-player");
 const trackList = document.querySelector("#track-list");
 const emptyState = document.querySelector("#empty-state");
@@ -41,7 +48,9 @@ let audioAnalyser = null;
 let waveformFrame = null;
 let waveformStartedAt = 0;
 let waveformFrequencies = null;
-let waveformFallbackNode = null;
+let equalizerFilters = [];
+let equalizerPreset = "flat";
+let equalizerGains = EQUALIZER_PRESETS.flat.slice();
 
 if (googleAccountEmail) {
   document.querySelector("#drive-sync-label").textContent = `Sinkronkan • ${googleAccountEmail}`;
@@ -139,6 +148,69 @@ function updateAudioStats(track) {
   document.querySelector("#playing-stat-bitrate").textContent = getEstimatedBitrate(track);
   document.querySelector("#playing-stat-size").textContent = formatSize(track.size);
   document.querySelector("#playing-track-stats").hidden = false;
+}
+
+function updateEqualizer(gains, preset, persist = true) {
+  const sliders = Array.from(document.querySelectorAll(".equalizer-slider"));
+  equalizerGains = sliders.map((slider, index) => {
+    const rawGain = Number(gains[index]);
+    const gain = Number.isFinite(rawGain) ? Math.max(-12, Math.min(12, rawGain)) : 0;
+    slider.value = String(gain);
+    document.querySelector(`#eq-value-${index}`).textContent = `${gain > 0 ? "+" : ""}${gain} dB`;
+    if (equalizerFilters[index]) equalizerFilters[index].gain.value = gain;
+    return gain;
+  });
+  equalizerPreset = preset;
+  document.querySelector("#equalizer-preset").value = preset;
+  if (persist) {
+    try {
+      localStorage.setItem(EQUALIZER_STORAGE_KEY, JSON.stringify({
+        preset: equalizerPreset,
+        gains: equalizerGains
+      }));
+    } catch (error) {
+      console.error("Could not save equalizer preferences:", error);
+      showToast(`Pengaturan equalizer gagal disimpan: ${error.message}`, true);
+    }
+  }
+}
+
+function loadEqualizerPreferences() {
+  const audioContextSupported = Boolean(window.AudioContext || window.webkitAudioContext);
+  if (!audioContextSupported) {
+    document.querySelectorAll(".equalizer-slider, #equalizer-preset").forEach((control) => {
+      control.disabled = true;
+    });
+    document.querySelector("#equalizer-hint").textContent =
+      "Equalizer audio tidak didukung browser ini. Coba browser versi terbaru.";
+    return;
+  }
+
+  try {
+    const savedPreferences = localStorage.getItem(EQUALIZER_STORAGE_KEY);
+    if (!savedPreferences) {
+      updateEqualizer(EQUALIZER_PRESETS.flat, "flat", false);
+      return;
+    }
+    const parsedPreferences = JSON.parse(savedPreferences);
+    if (!Array.isArray(parsedPreferences.gains) || parsedPreferences.gains.length !== 5) {
+      throw new Error("Data preset equalizer tidak valid.");
+    }
+    const preset = parsedPreferences.preset === "custom" ||
+      Object.prototype.hasOwnProperty.call(EQUALIZER_PRESETS, parsedPreferences.preset)
+      ? parsedPreferences.preset
+      : "custom";
+    updateEqualizer(parsedPreferences.gains, preset, false);
+  } catch (error) {
+    console.error("Could not restore equalizer preferences:", error);
+    updateEqualizer(EQUALIZER_PRESETS.flat, "flat", false);
+    showToast(`Preset equalizer tidak dapat dimuat: ${error.message}`, true);
+  }
+}
+
+function setEqualizerPreset(preset) {
+  const gains = EQUALIZER_PRESETS[preset];
+  if (gains) updateEqualizer(gains, preset);
 }
 
 function setAudioStatsOpen(isOpen) {
@@ -244,12 +316,32 @@ async function connectAudioVisualizer() {
     context = new AudioContextConstructor();
     source = context.createMediaElementSource(audio);
     const analyser = context.createAnalyser();
+    const filterDefinitions = [
+      { type: "lowshelf", frequency: 60 },
+      { type: "peaking", frequency: 230, q: 1 },
+      { type: "peaking", frequency: 910, q: 1 },
+      { type: "peaking", frequency: 3600, q: 1 },
+      { type: "highshelf", frequency: 14000 }
+    ];
+    const filters = filterDefinitions.map((definition, index) => {
+      const filter = context.createBiquadFilter();
+      filter.type = definition.type;
+      filter.frequency.value = definition.frequency;
+      if (definition.q) filter.Q.value = definition.q;
+      filter.gain.value = equalizerGains[index];
+      return filter;
+    });
     analyser.fftSize = 256;
     analyser.smoothingTimeConstant = 0.78;
-    source.connect(analyser);
+    source.connect(filters[0]);
+    filters.forEach((filter, index) => {
+      const nextNode = filters[index + 1] || analyser;
+      filter.connect(nextNode);
+    });
     analyser.connect(context.destination);
     audioContext = context;
     audioAnalyser = analyser;
+    equalizerFilters = filters;
     waveformFrequencies = new Uint8Array(analyser.frequencyBinCount);
   } catch (error) {
     if (source && context) source.connect(context.destination);
@@ -1127,6 +1219,16 @@ document.querySelector("#cancel-add-tracks").addEventListener("click", () => {
 document.querySelector("#add-tracks-form").addEventListener("submit", savePlaylistTracks);
 document.querySelector("#delete-playlist-button").addEventListener("click", deletePlaylist);
 document.querySelector("#drive-sync-button").addEventListener("click", syncWithGoogleDrive);
+document.querySelector("#equalizer-preset").addEventListener("change", (event) => {
+  if (event.target.value !== "custom") setEqualizerPreset(event.target.value);
+});
+document.querySelectorAll(".equalizer-slider").forEach((slider) => {
+  slider.addEventListener("input", () => {
+    const gains = Array.from(document.querySelectorAll(".equalizer-slider"))
+      .map((band) => Number(band.value));
+    updateEqualizer(gains, "custom");
+  });
+});
 playButton.addEventListener("click", () => {
   if (audio.paused) {
     audio.play().then(async () => {
@@ -1203,6 +1305,7 @@ window.addEventListener("offline", updateConnectionStatus);
 
 async function startApp() {
   updateConnectionStatus();
+  loadEqualizerPreferences();
   try {
     database = await openDatabase();
     await loadLibrary();

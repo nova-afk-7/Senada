@@ -112,6 +112,22 @@ main { padding-top: 37px; }
 #playing-page-format { margin: 8px 0 0; color: #929b90; font-size: 11px; }
 .playing-track-stats { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 9px; margin-top: 17px; color: #c1ccba; font-size: 9px; font-weight: 600; }
 .playing-stat-divider { width: 3px; height: 3px; border-radius: 50%; background: #707b6d; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.equalizer-panel { width: min(590px, 100%); margin-top: 23px; padding: 15px 18px 12px; text-align: left; border: 1px solid var(--line); border-radius: 13px; background: rgba(255, 255, 255, .025); }
+.equalizer-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.equalizer-header h2 { margin: 5px 0 0; font-size: 16px; }
+.equalizer-header .section-kicker { font-size: 8px; }
+.equalizer-preset-label select { min-width: 105px; height: 33px; padding: 0 26px 0 10px; color: var(--text); border: 1px solid var(--line); border-radius: 7px; outline: 0; background: #202520; font-size: 10px; }
+.equalizer-preset-label select:focus-visible { border-color: rgba(196, 240, 107, .5); }
+.equalizer-preset-label option { color: var(--text); background: #202520; }
+.equalizer-bands { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 13px; }
+.equalizer-band { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 5px; color: #9aa396; font-size: 9px; }
+.equalizer-band output { color: #d3ddc8; font-size: 9px; font-variant-numeric: tabular-nums; }
+.equalizer-band > span { white-space: nowrap; }
+.equalizer-slider { width: 24px; height: 76px; margin: 0; accent-color: var(--accent); cursor: pointer; direction: rtl; writing-mode: vertical-lr; }
+.equalizer-slider:focus-visible { outline: 2px solid rgba(196, 240, 107, .5); outline-offset: 3px; border-radius: 5px; }
+.equalizer-slider:disabled, .equalizer-preset-label select:disabled { cursor: not-allowed; opacity: .5; }
+.equalizer-hint { margin: 10px 0 0; color: #788176; font-size: 8px; line-height: 1.5; text-align: center; }
 
 .welcome-card {
   position: relative;
@@ -477,6 +493,13 @@ h2 {
   .playing-track-info { margin-top: 7px; }
   #playing-page-title { font-size: clamp(24px, 7vw, 32px); }
   .playing-track-stats { gap: 7px; margin-top: 13px; font-size: 8px; }
+  .equalizer-panel { margin-top: 17px; padding: 13px 10px 10px; }
+  .equalizer-header h2 { font-size: 15px; }
+  .equalizer-preset-label select { min-width: 95px; height: 31px; font-size: 9px; }
+  .equalizer-bands { gap: 2px; margin-top: 10px; }
+  .equalizer-band { font-size: 8px; }
+  .equalizer-band > span { font-size: 8px; }
+  .equalizer-slider { height: 70px; }
   .welcome-card { min-height: 345px; align-items: start; padding: 30px 24px; }
   .welcome-copy { width: 100%; }
   h1 { margin-top: 15px; font-size: clamp(32px, 9vw, 42px); }
