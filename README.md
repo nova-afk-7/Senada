@@ -24,8 +24,8 @@ Sinkronisasi perlu internet. Setelah proses selesai, setiap perangkat menyimpan 
    ```
 
    Client ID ini adalah pengenal aplikasi publik, bukan client secret. Jangan menaruh client secret di aplikasi browser.
-5. Publikasikan ulang folder ini ke hosting HTTPS. Di setiap perangkat, buka Senada saat online dan tekan **Sinkronkan dengan Google Drive**. Pilih akun Google yang sama dan setujui akses.
+5. Publikasikan ulang folder ini ke hosting HTTPS. Di perangkat pertama, buka Senada saat online dan tekan **Hubungkan Gmail & sinkronkan**, pilih akun Gmail, lalu setujui akses Google Drive. Di perangkat lain, tekan tombol yang sama dan pilih Gmail yang sama. Setelah sinkronisasi berhasil, alamat Gmail yang terhubung akan ditampilkan di tombol dan petunjuknya.
 
-Sinkronisasi menggabungkan lagu, playlist, dan riwayat di perangkat dengan cadangan Drive; penghapusan lagu/playlist juga diterapkan di perangkat lain setelah sinkronisasi. Sinkronkan perangkat satu per satu saat online, bukan bersamaan, agar perubahan terbaru tidak saling menimpa. Jika cadangan berisi banyak atau berkas audio besar, proses unggah/unduh memerlukan waktu dan kuota Drive.
+Sinkronisasi menggabungkan lagu, playlist, dan riwayat di perangkat dengan cadangan Drive; penghapusan lagu/playlist juga diterapkan di perangkat lain setelah sinkronisasi. Senada memeriksa alamat Gmail agar perangkat tidak tersambung tanpa sengaja ke akun berbeda. Sinkronkan perangkat satu per satu saat online, bukan bersamaan, agar perubahan terbaru tidak saling menimpa. Jika cadangan berisi banyak atau berkas audio besar, proses unggah/unduh memerlukan waktu dan kuota Drive.
 
 Service worker membutuhkan HTTPS (atau `localhost`). Membuka `index.html` sebagai file biasa tidak mengaktifkan mode offline. Tanpa Client ID Google yang dikonfigurasi, fitur pemutar musik lokal tetap bisa digunakan, tetapi sinkronisasi Drive belum aktif.

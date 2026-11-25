@@ -1,8 +1,9 @@
 const DB_NAME = "senada-music-library";
 const DB_VERSION = 3;
 const DRIVE_BACKUP_NAME = "senada-library-v1";
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+const DRIVE_SCOPE = "openid email https://www.googleapis.com/auth/drive.appdata";
 const BACKUP_MAGIC = "SENADA1\n";
+const GOOGLE_ACCOUNT_KEY = "senada-google-account";
 const audio = document.querySelector("#audio-player");
 const trackList = document.querySelector("#track-list");
 const emptyState = document.querySelector("#empty-state");
@@ -28,6 +29,12 @@ let googleAccessToken = null;
 let googleTokenExpiresAt = 0;
 let driveSyncInProgress = false;
 let toastTimer;
+let googleAccountEmail = localStorage.getItem(GOOGLE_ACCOUNT_KEY) || "";
+
+if (googleAccountEmail) {
+  document.querySelector("#drive-sync-label").textContent = `Sinkronkan • ${googleAccountEmail}`;
+  document.querySelector("#drive-sync-hint").textContent = `Akun di perangkat ini: ${googleAccountEmail}. Gunakan Gmail ini di perangkat lain.`;
+}
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -740,7 +747,9 @@ function getGoogleAccessToken() {
       scope: DRIVE_SCOPE,
       callback: (response) => {
         if (response.error) {
-          reject(new Error(`Google menolak akses: ${response.error_description || response.error}`));
+          const error = new Error(`Google menolak akses: ${response.error_description || response.error}`);
+          error.googleOAuthCode = response.error;
+          reject(error);
           return;
         }
         googleAccessToken = response.access_token;
@@ -749,8 +758,18 @@ function getGoogleAccessToken() {
       },
       error_callback: (error) => reject(new Error(error.message || "Jendela masuk Google tidak dapat dibuka."))
     });
-    tokenClient.requestAccessToken({ prompt: "select_account" });
+    const request = googleAccountEmail
+      ? { login_hint: googleAccountEmail }
+      : { prompt: "select_account" };
+    tokenClient.requestAccessToken(request);
   });
+}
+
+async function getGoogleAccountEmail() {
+  const response = await driveFetch("https://www.googleapis.com/oauth2/v3/userinfo");
+  const user = await response.json();
+  if (!user.email) throw new Error("Google tidak mengembalikan alamat Gmail untuk akun ini.");
+  return user.email;
 }
 
 async function driveFetch(url, options = {}) {
@@ -818,6 +837,7 @@ async function uploadDriveBackup(fileId, blob) {
 async function syncWithGoogleDrive() {
   const button = document.querySelector("#drive-sync-button");
   const label = document.querySelector("#drive-sync-label");
+  const hint = document.querySelector("#drive-sync-hint");
   if (driveSyncInProgress) return;
   if (!navigator.onLine) {
     showToast("Hubungkan ke internet untuk menyinkronkan dengan Google Drive.", true);
@@ -834,6 +854,14 @@ async function syncWithGoogleDrive() {
   label.textContent = "Menghubungkan ke Google Drive...";
   try {
     await getGoogleAccessToken();
+    const accountEmail = await getGoogleAccountEmail();
+    if (googleAccountEmail && googleAccountEmail.toLowerCase() !== accountEmail.toLowerCase()) {
+      googleAccessToken = null;
+      throw new Error(`Akun yang dipilih adalah ${accountEmail}, tetapi perangkat ini sebelumnya memakai ${googleAccountEmail}. Pilih akun Gmail yang sama agar datanya tidak tercampur.`);
+    }
+    localStorage.setItem(GOOGLE_ACCOUNT_KEY, accountEmail);
+    googleAccountEmail = accountEmail;
+    hint.textContent = `Terhubung sebagai ${accountEmail}. Gunakan Gmail ini di perangkat lain.`;
     const backup = await findDriveBackup();
     const remoteState = backup ? await downloadDriveBackup(backup.id) : {
       tracks: [],
@@ -846,10 +874,15 @@ async function syncWithGoogleDrive() {
     label.textContent = "Mengunggah koleksi...";
     const backupBlob = createBackupBlob(mergedState);
     await uploadDriveBackup(backup && backup.id, backupBlob);
-    label.textContent = "Sinkronkan dengan Google Drive";
+    label.textContent = `Sinkronkan • ${accountEmail}`;
     showToast(`Sinkronisasi selesai: ${tracks.length} lagu dan ${playlists.length} playlist. Koleksi di perangkat ini dan Drive sudah digabung.`);
   } catch (error) {
-    label.textContent = "Coba sinkronkan lagi";
+    label.textContent = googleAccountEmail
+      ? `Sinkronkan • ${googleAccountEmail}`
+      : "Hubungkan Gmail & sinkronkan";
+    if (error.googleOAuthCode === "access_denied") {
+      hint.textContent = "Akses Google Drive belum disetujui. Coba lagi dan setujui izin yang diminta.";
+    }
     showToast(`Sinkronisasi gagal: ${error.message}`, true);
     console.error("Google Drive sync failed:", error);
   } finally {
