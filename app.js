@@ -31,6 +31,9 @@ const playingToolsMenu = document.querySelector("#playing-tools-menu");
 const appShell = document.querySelector(".app-shell");
 const nowPlayingScreen = document.querySelector("#now-playing-screen");
 const waveformCanvas = document.querySelector("#waveform-canvas");
+const mediaCarouselTrack = document.querySelector("#media-carousel-track");
+const lyricsContent = document.querySelector("#lyrics-content");
+const lyricsEmpty = document.querySelector("#lyrics-empty");
 const objectUrls = new Map();
 let database;
 let tracks = [];
@@ -63,6 +66,9 @@ let surroundValue = 0;
 let bassValue = 0;
 let playbackMode = "sequential";
 let smartShuffleHistory = [];
+let mediaPage = "visualizer";
+let activeLyricIndex = -1;
+let swipeStart = null;
 
 const validPlaybackModes = ["sequential", "shuffle", "repeat", "smart"];
 
@@ -162,6 +168,113 @@ function updateAudioStats(track) {
   document.querySelector("#playing-stat-bitrate").textContent = getEstimatedBitrate(track);
   document.querySelector("#playing-stat-size").textContent = formatSize(track.size);
   document.querySelector("#playing-track-stats").hidden = false;
+  renderLyrics(track);
+}
+
+function parseLyrics(lyrics) {
+  return lyrics.split(/\r?\n/).flatMap((line) => {
+    const timestamps = Array.from(line.matchAll(/\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/g));
+    const text = line.replace(/\[(?:\d{1,2}):\d{2}(?:\.\d{1,3})?\]/g, "").trim();
+    if (timestamps.length === 0) return text ? [{ time: null, text }] : [];
+    return timestamps.map((stamp) => {
+      const fraction = stamp[3] ? Number(`0.${stamp[3]}`) : 0;
+      return {
+        time: Number(stamp[1]) * 60 + Number(stamp[2]) + fraction,
+        text
+      };
+    });
+  }).sort((a, b) => {
+    if (a.time === null) return b.time === null ? 0 : -1;
+    if (b.time === null) return 1;
+    return a.time - b.time;
+  });
+}
+
+function renderLyrics(track = tracks.find((item) => item.id === currentTrackId)) {
+  const lyrics = track && typeof track.lyrics === "string" ? track.lyrics.trim() : "";
+  const lines = lyrics ? parseLyrics(lyrics) : [];
+  lyricsContent.replaceChildren();
+  activeLyricIndex = -1;
+  lyricsEmpty.hidden = lines.length > 0;
+  document.querySelector("#edit-lyrics-button").hidden = lines.length === 0;
+  lines.forEach((line, index) => {
+    const element = document.createElement("p");
+    element.className = "lyric-line";
+    element.textContent = line.text;
+    if (line.time !== null) element.dataset.time = String(line.time);
+    lyricsContent.append(element);
+  });
+  updateActiveLyric();
+}
+
+function updateActiveLyric() {
+  const lyricElements = Array.from(lyricsContent.children);
+  const timedLyrics = lyricElements
+    .map((element, index) => ({ index, time: Number(element.dataset.time) }))
+    .filter((line) => Number.isFinite(line.time));
+  let nextActiveIndex = -1;
+  for (const line of timedLyrics) {
+    if (line.time <= audio.currentTime) nextActiveIndex = line.index;
+    else break;
+  }
+  lyricElements.forEach((element, index) => {
+    element.classList.toggle("is-active", index === nextActiveIndex);
+  });
+  if (nextActiveIndex !== activeLyricIndex && nextActiveIndex >= 0) {
+    const activeLine = lyricElements[nextActiveIndex];
+    lyricsContent.scrollTo({
+      top: activeLine.offsetTop - lyricsContent.offsetTop - lyricsContent.clientHeight / 2 + activeLine.clientHeight / 2,
+      behavior: "smooth"
+    });
+  }
+  activeLyricIndex = nextActiveIndex;
+}
+
+function setMediaPage(page) {
+  mediaPage = page === "lyrics" ? "lyrics" : "visualizer";
+  mediaCarouselTrack.classList.toggle("show-lyrics", mediaPage === "lyrics");
+  document.querySelectorAll("[data-media-page]").forEach((button) => {
+    const isActive = button.dataset.mediaPage === mediaPage;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+  document.querySelector("#media-page-hint").textContent =
+    mediaPage === "lyrics" ? "Geser kembali untuk melihat visualizer" : "Geser untuk melihat lirik";
+  if (mediaPage === "lyrics") updateActiveLyric();
+  else drawWaveform();
+}
+
+function openLyricsEditor() {
+  const track = tracks.find((item) => item.id === currentTrackId);
+  if (!track) {
+    showToast("Pilih lagu sebelum menambahkan lirik.", true);
+    return;
+  }
+  document.querySelector("#lyrics-dialog-title").textContent =
+    track.lyrics ? "Edit lirik" : "Tambah lirik";
+  document.querySelector("#lyrics-input").value = track.lyrics || "";
+  document.querySelector("#lyrics-dialog").showModal();
+  document.querySelector("#lyrics-input").focus();
+}
+
+async function saveCurrentLyrics(lyrics) {
+  const track = tracks.find((item) => item.id === currentTrackId);
+  if (!track) {
+    showToast("Pilih lagu sebelum menambahkan lirik.", true);
+    return;
+  }
+  track.lyrics = lyrics.trim();
+  track.updatedAt = Date.now();
+  try {
+    const transaction = database.transaction("tracks", "readwrite");
+    transaction.objectStore("tracks").put(track);
+    await transactionDone(transaction);
+    renderLyrics(track);
+    document.querySelector("#lyrics-dialog").close();
+    showToast(track.lyrics ? "Lirik berhasil disimpan di perangkat ini." : "Lirik dihapus.");
+  } catch (error) {
+    showToast(`Lirik gagal disimpan: ${error.message}`, true);
+  }
 }
 
 function updateEqualizer(gains, preset, persist = true) {
@@ -1413,6 +1526,33 @@ document.querySelector("#cancel-add-tracks").addEventListener("click", () => {
 document.querySelector("#add-tracks-form").addEventListener("submit", savePlaylistTracks);
 document.querySelector("#delete-playlist-button").addEventListener("click", deletePlaylist);
 document.querySelector("#drive-sync-button").addEventListener("click", syncWithGoogleDrive);
+document.querySelector("#add-lyrics-button").addEventListener("click", openLyricsEditor);
+document.querySelector("#edit-lyrics-button").addEventListener("click", openLyricsEditor);
+document.querySelector("#cancel-lyrics").addEventListener("click", () => {
+  document.querySelector("#lyrics-dialog").close();
+});
+document.querySelector("#lyrics-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveCurrentLyrics(document.querySelector("#lyrics-input").value);
+});
+document.querySelectorAll("[data-media-page]").forEach((button) => {
+  button.addEventListener("click", () => setMediaPage(button.dataset.mediaPage));
+});
+const mediaCarousel = document.querySelector("#media-carousel");
+mediaCarousel.addEventListener("pointerdown", (event) => {
+  swipeStart = { x: event.clientX, y: event.clientY };
+});
+mediaCarousel.addEventListener("pointerup", (event) => {
+  if (!swipeStart) return;
+  const deltaX = event.clientX - swipeStart.x;
+  const deltaY = event.clientY - swipeStart.y;
+  swipeStart = null;
+  if (Math.abs(deltaX) < 45 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return;
+  setMediaPage(mediaPage === "visualizer" ? "lyrics" : "visualizer");
+});
+mediaCarousel.addEventListener("pointercancel", () => {
+  swipeStart = null;
+});
 const shuffleButton = document.querySelector("#shuffle-button");
 shuffleButton.addEventListener("click", () => {
   const menu = document.querySelector("#shuffle-menu");
@@ -1520,9 +1660,11 @@ audio.addEventListener("timeupdate", () => {
   document.querySelector("#seek-bar").value = audio.duration
     ? Math.round((audio.currentTime / audio.duration) * 1000)
     : 0;
+  updateActiveLyric();
 });
 audio.addEventListener("loadedmetadata", () => {
   document.querySelector("#duration-time").textContent = formatTime(audio.duration);
+  updateActiveLyric();
   const currentTrack = tracks.find((track) => track.id === currentTrackId);
   if (currentTrack && Number.isFinite(audio.duration)) {
     currentTrack.duration = audio.duration;

@@ -52,9 +52,26 @@
           </div>
           <div class="playing-page-content">
             <p class="eyebrow playing-eyebrow"><span class="eyebrow-line"></span> SEDANG DIPUTAR</p>
-            <div class="waveform-wrap">
-              <canvas id="waveform-canvas" role="img" aria-label="Ilustrasi gelombang audio yang bergerak mengikuti musik"></canvas>
-              <span class="waveform-label"><span class="waveform-live-dot"></span> AUDIO VISUALIZER</span>
+            <div class="media-carousel" id="media-carousel">
+              <div class="media-carousel-track" id="media-carousel-track">
+                <div class="media-slide waveform-wrap" aria-label="Audio visualizer">
+                  <canvas id="waveform-canvas" role="img" aria-label="Ilustrasi gelombang audio yang bergerak mengikuti musik"></canvas>
+                  <span class="waveform-label"><span class="waveform-live-dot"></span> AUDIO VISUALIZER</span>
+                </div>
+                <section class="media-slide lyrics-slide" id="lyrics-slide" aria-label="Lirik lagu" aria-live="polite">
+                  <div class="lyrics-content" id="lyrics-content"></div>
+                  <div class="lyrics-empty" id="lyrics-empty">
+                    <p>Lirik belum ditambahkan untuk lagu ini.</p>
+                    <button class="lyrics-edit-button" id="add-lyrics-button" type="button">Tambah lirik</button>
+                  </div>
+                  <button class="lyrics-edit-button lyrics-edit-existing" id="edit-lyrics-button" type="button" hidden>Edit lirik</button>
+                </section>
+              </div>
+            </div>
+            <div class="media-carousel-navigation" aria-label="Pilih tampilan pemutaran">
+              <button class="media-page-dot is-active" type="button" data-media-page="visualizer" aria-label="Tampilkan visualizer" aria-pressed="true"></button>
+              <button class="media-page-dot" type="button" data-media-page="lyrics" aria-label="Tampilkan lirik" aria-pressed="false"></button>
+              <span id="media-page-hint">Geser untuk melihat lirik</span>
             </div>
             <div class="playing-track-info">
               <h1 id="playing-page-title">Pilih lagu</h1>
@@ -305,6 +322,22 @@
         <div class="dialog-actions">
           <button class="dialog-cancel" id="cancel-add-tracks" type="button">Batal</button>
           <button class="dialog-submit" type="submit">Simpan pilihan</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="app-dialog" id="lyrics-dialog" aria-labelledby="lyrics-dialog-title">
+      <form id="lyrics-form">
+        <div class="dialog-heading">
+          <p class="section-kicker">LIRIK LAGU</p>
+          <h2 id="lyrics-dialog-title">Tambah lirik</h2>
+          <p>Tempel lirik biasa atau lirik bertanda waktu format LRC. Lirik disimpan di perangkat ini.</p>
+        </div>
+        <label class="dialog-label" for="lyrics-input">Lirik</label>
+        <textarea class="dialog-input lyrics-input" id="lyrics-input" rows="10" maxlength="100000" placeholder="Tempel lirik di sini&#10;&#10;Format LRC: [00:12.50]Baris lirik" spellcheck="false"></textarea>
+        <div class="dialog-actions">
+          <button class="dialog-cancel" id="cancel-lyrics" type="button">Batal</button>
+          <button class="dialog-submit" type="submit">Simpan lirik</button>
         </div>
       </form>
     </dialog>
