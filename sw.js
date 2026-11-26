@@ -1,4 +1,4 @@
-const CACHE_NAME = "senada-shell-v13";
+const CACHE_NAME = "senada-shell-v14";
 const APP_SHELL = [
   "./",
   "./index.html",

@@ -32,6 +32,6 @@ Saat lagu dipilih, Senada membuka tampilan pemutaran khusus dengan ilustrasi gel
 
 Di sebelah kiri kontrol volume, tombol ikon acak dapat membuka empat mode antrean: **Urutan** dari awal koleksi, **Acak** untuk pemilihan acak, **Pengulangan** untuk mengulang lagu yang sedang diputar, dan **Smart Shuffle** untuk memilih lagu acak sambil menghindari lagu yang baru diputar. Mode antrean tersimpan di perangkat.
 
-Pada halaman pemutaran, geser area visualizer ke samping atau pilih titik navigasi untuk membuka lirik. Tambahkan atau edit lirik dengan menempelkannya pada panel lirik; teks biasa juga didukung, sedangkan format bertanda waktu LRC akan mengikuti posisi lagu. Lirik disimpan bersama data lagu di perangkat dan ikut dalam cadangan Google Drive saat sinkronisasi.
+Pada halaman pemutaran, geser area visualizer ke samping atau pilih titik navigasi untuk membuka lirik. Tambahkan atau edit lirik dengan menempelkannya atau mengimpor file `.lrc`/`.txt`; teks biasa juga didukung, sedangkan format bertanda waktu LRC akan mengikuti posisi lagu. Lirik disimpan bersama data lagu di perangkat dan ikut dalam cadangan Google Drive saat sinkronisasi.
 
 Service worker membutuhkan HTTPS (atau `localhost`). Membuka `index.html` sebagai file biasa tidak mengaktifkan mode offline. Tanpa Client ID Google yang dikonfigurasi, fitur pemutar musik lokal tetap bisa digunakan, tetapi sinkronisasi Drive belum aktif.

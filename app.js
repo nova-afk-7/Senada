@@ -1535,6 +1535,18 @@ document.querySelector("#lyrics-form").addEventListener("submit", (event) => {
   event.preventDefault();
   saveCurrentLyrics(document.querySelector("#lyrics-input").value);
 });
+document.querySelector("#lyrics-file-input").addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    if (file.size > 100000) throw new Error("Ukuran file lirik melebihi batas 100 KB.");
+    document.querySelector("#lyrics-input").value = await file.text();
+  } catch (error) {
+    showToast(`File lirik gagal dibaca: ${error.message}`, true);
+  } finally {
+    event.target.value = "";
+  }
+});
 document.querySelectorAll("[data-media-page]").forEach((button) => {
   button.addEventListener("click", () => setMediaPage(button.dataset.mediaPage));
 });
