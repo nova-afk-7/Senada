@@ -90,16 +90,22 @@
                   <p class="section-kicker">SESUAIKAN SUARA</p>
                   <h2 id="equalizer-title">Equalizer audio</h2>
                 </div>
-                <label class="equalizer-preset-label">
-                  <span class="sr-only">Preset equalizer</span>
-                  <select id="equalizer-preset" aria-label="Preset equalizer">
-                    <option value="flat">Flat</option>
-                    <option value="bass">Bass boost</option>
-                    <option value="vocal">Vokal</option>
-                    <option value="treble">Treble</option>
-                    <option value="custom">Kustom</option>
-                  </select>
-                </label>
+                <div class="equalizer-options">
+                  <label class="equalizer-toggle">
+                    <input id="equalizer-enabled" type="checkbox" checked>
+                    <span>Equalizer aktif</span>
+                  </label>
+                  <label class="equalizer-preset-label">
+                    <span class="sr-only">Preset equalizer</span>
+                    <select id="equalizer-preset" aria-label="Preset equalizer">
+                      <option value="flat">Flat</option>
+                      <option value="bass">Bass boost</option>
+                      <option value="vocal">Vokal</option>
+                      <option value="treble">Treble</option>
+                      <option value="custom">Kustom</option>
+                    </select>
+                  </label>
+                </div>
               </div>
               <div class="equalizer-bands" id="equalizer-bands">
                 <label class="equalizer-band">

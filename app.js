@@ -61,6 +61,7 @@ let surroundWetGain = null;
 let surroundDryGain = null;
 let equalizerPreset = "flat";
 let equalizerGains = EQUALIZER_PRESETS.flat.slice();
+let equalizerEnabled = true;
 let balanceValue = 0;
 let surroundValue = 0;
 let bassValue = 0;
@@ -284,11 +285,24 @@ function updateEqualizer(gains, preset, persist = true) {
     const gain = Number.isFinite(rawGain) ? Math.max(-12, Math.min(12, rawGain)) : 0;
     slider.value = String(gain);
     document.querySelector(`#eq-value-${index}`).textContent = `${gain > 0 ? "+" : ""}${gain} dB`;
-    if (equalizerFilters[index]) equalizerFilters[index].gain.value = gain;
+    if (equalizerFilters[index]) equalizerFilters[index].gain.value = equalizerEnabled ? gain : 0;
     return gain;
   });
   equalizerPreset = preset;
   document.querySelector("#equalizer-preset").value = preset;
+  if (persist) persistAudioPreferences();
+}
+
+function setEqualizerEnabled(enabled, persist = true) {
+  equalizerEnabled = Boolean(enabled);
+  document.querySelector("#equalizer-enabled").checked = equalizerEnabled;
+  document.querySelector("#equalizer-preset").disabled = !equalizerEnabled;
+  document.querySelectorAll(".equalizer-slider").forEach((slider) => {
+    slider.disabled = !equalizerEnabled;
+  });
+  equalizerFilters.forEach((filter, index) => {
+    filter.gain.value = equalizerEnabled ? equalizerGains[index] : 0;
+  });
   if (persist) persistAudioPreferences();
 }
 
@@ -318,6 +332,7 @@ function persistAudioPreferences() {
     localStorage.setItem(EQUALIZER_STORAGE_KEY, JSON.stringify({
       preset: equalizerPreset,
       gains: equalizerGains,
+      enabled: equalizerEnabled,
       balance: balanceValue,
       surround: surroundValue,
       bass: bassValue
@@ -331,7 +346,7 @@ function persistAudioPreferences() {
 function loadEqualizerPreferences() {
   const audioContextSupported = Boolean(window.AudioContext || window.webkitAudioContext);
   if (!audioContextSupported) {
-    document.querySelectorAll(".equalizer-slider, .sound-effect-control input, #equalizer-preset").forEach((control) => {
+    document.querySelectorAll(".equalizer-slider, .sound-effect-control input, #equalizer-preset, #equalizer-enabled").forEach((control) => {
       control.disabled = true;
     });
     document.querySelector("#equalizer-hint").textContent =
@@ -343,6 +358,7 @@ function loadEqualizerPreferences() {
     const savedPreferences = localStorage.getItem(EQUALIZER_STORAGE_KEY);
     if (!savedPreferences) {
       updateEqualizer(EQUALIZER_PRESETS.flat, "flat", false);
+      setEqualizerEnabled(true, false);
       return;
     }
     const parsedPreferences = JSON.parse(savedPreferences);
@@ -354,6 +370,7 @@ function loadEqualizerPreferences() {
       ? parsedPreferences.preset
       : "custom";
     updateEqualizer(parsedPreferences.gains, preset, false);
+    setEqualizerEnabled(parsedPreferences.enabled !== false, false);
     updateSoundEffects({
       balance: parsedPreferences.balance,
       surround: parsedPreferences.surround,
@@ -362,6 +379,7 @@ function loadEqualizerPreferences() {
   } catch (error) {
     console.error("Could not restore equalizer preferences:", error);
     updateEqualizer(EQUALIZER_PRESETS.flat, "flat", false);
+    setEqualizerEnabled(true, false);
     updateSoundEffects({ balance: 0, surround: 0, bass: 0 }, false);
     showToast(`Preset equalizer tidak dapat dimuat: ${error.message}`, true);
   }
@@ -555,7 +573,7 @@ async function connectAudioVisualizer() {
       filter.type = definition.type;
       filter.frequency.value = definition.frequency;
       if (definition.q) filter.Q.value = definition.q;
-      filter.gain.value = equalizerGains[index];
+      filter.gain.value = equalizerEnabled ? equalizerGains[index] : 0;
       return filter;
     });
     const bass = context.createBiquadFilter();
@@ -1599,6 +1617,9 @@ document.addEventListener("keydown", (event) => {
 });
 document.querySelector("#equalizer-preset").addEventListener("change", (event) => {
   if (event.target.value !== "custom") setEqualizerPreset(event.target.value);
+});
+document.querySelector("#equalizer-enabled").addEventListener("change", (event) => {
+  setEqualizerEnabled(event.target.checked);
 });
 document.querySelectorAll(".equalizer-slider").forEach((slider) => {
   slider.addEventListener("input", () => {
